@@ -1,0 +1,366 @@
+:root {
+  /* ========================================================
+     CRYSTAL WHITE & MATTE BLACK AESTHETIC DESIGN SYSTEM
+     Monochrome Luxury Streetwear & Archival Minimalism
+     - Pure Crystal White Canvas (#FFFFFF)
+     - Rich Matte Black Accents & Typography (#121212 / #0A0A0A)
+     - Clean Crisp Hairline Borders (#E5E7EB / rgba(0, 0, 0, 0.08))
+     - Crystal Glass Overlays & Matte Highlights
+  ======================================================== */
+
+  /* Crystal White Grounds */
+  --bg-primary: #FFFFFF;         /* Pure Crystal White Canvas */
+  --bg-secondary: #FAFAFA;       /* Ultra-clean Crystal White Panel */
+  --bg-surface: #FFFFFF;         /* Pure White Surface */
+  --bg-card: #FFFFFF;
+  --bg-tertiary: #F4F4F5;        /* Cool light contrast container */
+  --bg-dark: #121212;            /* Matte Black */
+  --bg-matte: #121212;           /* Deep Matte Black */
+
+  /* Matte Black Typography */
+  --text-primary: #121212;       /* Matte Black Primary Text */
+  --text-dark: #000000;
+  --text-secondary: #52525B;     /* Cool Modern Slate Grey */
+  --text-muted: #8E8E93;
+  --text-light: #FFFFFF;         /* Crystal White Text */
+
+  /* Monochrome High-Contrast Accents */
+  --accent-gold: #121212;        /* Matte Black Core Accent */
+  --accent-gold-hover: #27272A;
+  --accent-gold-light: #F4F4F5;
+  --accent-gold-fade: rgba(18, 18, 18, 0.06);
+
+  /* Aliases mapped to Crystal White & Matte Black */
+  --sage-primary: #121212;
+  --sage-deep: #000000;
+  --sage-hover: #27272A;
+  --sage-light: #52525B;
+  --sage-soft: #F4F4F5;
+  --sage-muted: rgba(18, 18, 18, 0.04);
+  --sage-border: #E4E4E7;
+  --sage-glow: rgba(0, 0, 0, 0.12);
+
+  --secondary-primary: #121212;
+  --secondary-deep: #000000;
+  --secondary-hover: #27272A;
+  --secondary-light: #F4F4F5;
+  --secondary-soft: #FFFFFF;
+  --secondary-muted: rgba(18, 18, 18, 0.05);
+  --secondary-border: #E4E4E7;
+  --secondary-glow: rgba(0, 0, 0, 0.08);
+
+  --olive-primary: var(--secondary-primary);
+  --olive-deep: var(--secondary-deep);
+  --olive-hover: var(--secondary-hover);
+  --olive-light: var(--secondary-light);
+  --olive-soft: var(--secondary-soft);
+  --olive-muted: var(--secondary-muted);
+  --olive-border: var(--secondary-border);
+  --olive-glow: var(--secondary-glow);
+
+  --gold-primary: #121212;
+  --gold-hover: #27272A;
+  --gold-light: #F4F4F5;
+  --gold-muted: rgba(18, 18, 18, 0.05);
+  --gold-border: #E4E4E7;
+  --gold-glow: rgba(0, 0, 0, 0.08);
+
+  /* Crystal Hairline Borders */
+  --border-subtle: #E5E7EB;       /* Razor-sharp light border */
+  --border-dark: #D4D4D8;
+  --border-hairline: rgba(0, 0, 0, 0.06);
+  --border-active: #121212;
+  --border-glass: rgba(255, 255, 255, 0.2);
+
+  /* Status Tokens */
+  --accent-green: #15803D;
+  --accent-green-bg: rgba(21, 128, 61, 0.08);
+  --accent-amber: #B45309;
+  --accent-amber-bg: rgba(180, 83, 9, 0.08);
+  --accent-red: #DC2626;
+  --accent-red-bg: rgba(220, 38, 38, 0.08);
+
+  /* Typography Hierarchy */
+  --font-heading: 'Bricolage Grotesque', sans-serif;
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-subheading: 'Karla', sans-serif;
+  --font-btn: 'Karla', sans-serif;
+  --font-brand: 'Bricolage Grotesque', sans-serif;
+
+  /* Sharp Geometric Streetwear Radius */
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.08);
+  --shadow-sage: 0 4px 14px rgba(18, 18, 18, 0.15);
+  --shadow-olive: 0 4px 14px rgba(0, 0, 0, 0.12);
+  --shadow-gold: var(--shadow-olive);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: #D4D4D8;
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary);
+}
+
+/* Typography styles */
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.brand-font {
+  font-family: var(--font-brand);
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+/* Monochrome Subtle text */
+.sage-gradient-text {
+  color: var(--text-primary);
+}
+
+.olive-gradient-text, .gold-gradient-text {
+  color: var(--text-primary);
+}
+
+/* Badge styles */
+.subtle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-family: var(--font-subheading);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: var(--radius-sm);
+}
+
+.badge-new {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+
+.badge-preowned {
+  background: #FFFFFF;
+  color: #121212;
+  border: 1px solid #121212;
+}
+
+.badge-sold {
+  background: #F4F4F5;
+  color: #71717A;
+  border: 1px solid #E4E4E7;
+}
+
+.badge-alert {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+
+.badge-hold {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+
+/* Button & interactive primitives */
+button, .btn {
+  font-family: var(--font-btn);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 22px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+
+/* Primary Button: Matte Black with Crystal White text */
+.btn-primary {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #27272A;
+  border-color: #27272A;
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Secondary Button: Crystal White with Matte Black border */
+.btn-secondary {
+  background: #FFFFFF;
+  color: #121212;
+  border: 1px solid #121212;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #121212;
+  color: #FFFFFF;
+  border-color: #121212;
+}
+
+.btn-olive, .btn-gold {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+.btn-olive:hover:not(:disabled), .btn-gold:hover:not(:disabled) {
+  background: #27272A;
+  border-color: #27272A;
+}
+
+.btn-dark {
+  background: #121212;
+  color: #FFFFFF;
+  border: 1px solid #121212;
+}
+.btn-dark:hover {
+  background: #27272A;
+  border-color: #27272A;
+}
+
+/* Form inputs */
+input, select, textarea {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--text-primary);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Glassmorphism containers */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Continuous Marquee Ticker */
+@keyframes tickerLoop {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.fs-ticker-wrapper {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.fs-ticker-content {
+  display: inline-flex;
+  animation: tickerLoop 24s linear infinite;
+}
+
+.fs-ticker-content:hover {
+  animation-play-state: paused;
+}
+
+/* Responsive grid layout */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 0 32px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
