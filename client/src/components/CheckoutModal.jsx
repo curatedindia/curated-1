@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import supabase from '../supabaseClient';
 
 export default function CheckoutModal({
   isOpen,
@@ -27,24 +28,60 @@ export default function CheckoutModal({
 
   const [step, setStep] = useState('FORM'); // 'FORM' | 'GATEWAY' | 'CONFIRMED' | 'FAILED' | 'LATE_REFUND'
   const [formData, setFormData] = useState({
-    name: 'Tanmay Sharma',
+    name: '',
     mobile: '9820123456',
-    email: 'tanmay@example.com',
+    email: '',
     address: '402, Sunset Boulevard, Bandra West',
     city: 'Mumbai',
     state: 'Maharashtra',
     pincode: '400050'
   });
 
-  // Pre-fill user information if authenticated with Google OAuth
+  // When the modal mounts or when a Supabase Auth session is detected:
   useEffect(() => {
-    if (authUser) {
+    let isMounted = true;
+
+    const populateFromUser = (currentUser) => {
+      if (!currentUser) return;
+      const extractedEmail = currentUser.email || '';
+      const meta = currentUser.user_metadata || {};
+      const extractedName = meta.full_name || meta.name || '';
+
       setFormData((prev) => ({
         ...prev,
-        name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.name || prev.name,
-        email: authUser.email || prev.email
+        // Populate if empty, keep existing user edits intact
+        name: prev.name.trim() !== '' ? prev.name : extractedName,
+        email: prev.email.trim() !== '' ? prev.email : extractedEmail
       }));
+    };
+
+    // 1. Check if authUser prop is already available
+    if (authUser) {
+      populateFromUser(authUser);
     }
+
+    // 2. Get current user session using supabase.auth.getSession()
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error fetching Supabase session on checkout modal mount:', error);
+        return;
+      }
+      if (isMounted && session?.user) {
+        populateFromUser(session.user);
+      }
+    });
+
+    // 3. Listen for Supabase Auth session changes/events
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (isMounted && session?.user) {
+        populateFromUser(session.user);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
   }, [authUser]);
 
   const [policyAck, setPolicyAck] = useState(false); // CK-05: Mandatory unchecked by default

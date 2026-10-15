@@ -14,6 +14,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import supabase from '../supabaseClient';
 import { useCheckoutAuth } from '../hooks/useCheckoutAuth';
 
 export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) {
@@ -49,16 +50,48 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
   const [holdSecondsLeft, setHoldSecondsLeft] = useState(600);
   const [selectedPaymentTab, setSelectedPaymentTab] = useState('UPI');
 
-  // Pre-fill form when Google OAuth profile info is extracted
+  // When the page mounts or when a Supabase Auth session is detected:
   useEffect(() => {
-    if (profile.fullName || profile.email) {
+    let isMounted = true;
+
+    // Helper to safely populate Name and Email in state if they are empty
+    const populateFromUser = (currentUser) => {
+      if (!currentUser) return;
+      const extractedEmail = currentUser.email || '';
+      const meta = currentUser.user_metadata || {};
+      const extractedName = meta.full_name || meta.name || '';
+
       setFormData((prev) => ({
         ...prev,
-        name: profile.fullName || prev.name,
-        email: profile.email || prev.email
+        // Populate if empty, keep existing user edits intact
+        name: prev.name.trim() !== '' ? prev.name : extractedName,
+        email: prev.email.trim() !== '' ? prev.email : extractedEmail
       }));
-    }
-  }, [profile]);
+    };
+
+    // 1. Get the current user session using supabase.auth.getSession() on mount
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error fetching Supabase session on mount:', error);
+        return;
+      }
+      if (isMounted && session?.user) {
+        populateFromUser(session.user);
+      }
+    });
+
+    // 2. Listen for Supabase Auth session events (e.g. after Google OAuth redirect)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (isMounted && session?.user) {
+        populateFromUser(session.user);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   // 10-Minute Hold Reservation countdown timer
   useEffect(() => {
