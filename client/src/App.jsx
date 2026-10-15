@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import supabase from './supabaseClient';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProductCard from './components/ProductCard';
@@ -239,9 +240,81 @@ export default function App() {
     }
   });
 
+  // Authenticated user via Supabase Google OAuth
+  const [authUser, setAuthUser] = useState(null);
+
+  // Sync cart items to localStorage whenever updated
   useEffect(() => {
     localStorage.setItem('curated_cart', JSON.stringify(cartItems));
   }, [cartItems]);
+
+  // Handle URL routing for /checkout and Supabase Google OAuth callback
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const pathname = window.location.pathname.replace(/\/+$/, '');
+      const hash = window.location.hash;
+      const search = window.location.search;
+
+      // Automatically redirect/open checkout if user lands on /checkout or returns from OAuth
+      if (pathname === '/checkout' || hash.includes('access_token') || search.includes('code=')) {
+        setCurrentView('checkout');
+        setCheckoutModalOpen(true);
+      } else if (pathname === '' || pathname === '/') {
+        if (currentView === 'checkout') {
+          setCurrentView('home');
+          setCheckoutModalOpen(false);
+        }
+      }
+    };
+
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+
+    // Supabase auth state change listener (catches OAuth redirect completion)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setAuthUser(session.user);
+        const path = window.location.pathname.replace(/\/+$/, '');
+        if (path === '/checkout' || window.location.hash.includes('access_token')) {
+          setCurrentView('checkout');
+          setCheckoutModalOpen(true);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setAuthUser(null);
+      }
+    });
+
+    // Check initial active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAuthUser(session.user);
+      }
+    });
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleOpenCheckout = () => {
+    setCartDrawerOpen(false);
+    setCheckoutModalOpen(true);
+    setCurrentView('checkout');
+    if (window.location.pathname !== '/checkout') {
+      window.history.pushState({}, '', '/checkout');
+    }
+  };
+
+  const handleCloseCheckout = () => {
+    setCheckoutModalOpen(false);
+    if (currentView === 'checkout') {
+      setCurrentView('home');
+    }
+    if (window.location.pathname === '/checkout') {
+      window.history.pushState({}, '', '/');
+    }
+  };
 
   useEffect(() => {
     fetchProductsAndSettings();
@@ -894,6 +967,41 @@ export default function App() {
         {currentView === 'contact' && <ContactView settings={settings} />}
 
         {/* ========================================================
+            VIEW: CHECKOUT (/checkout)
+        ======================================================== */}
+        {currentView === 'checkout' && !checkoutModalOpen && (
+          <div className="container" style={{ padding: '80px 20px', maxWidth: '640px', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px' }}>
+              CHECKOUT
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>
+              {cartItems.length > 0
+                ? `You have ${cartItems.length} curated piece${cartItems.length > 1 ? 's' : ''} in your bag.`
+                : 'Your bag is currently empty.'}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+              {cartItems.length > 0 ? (
+                <button
+                  onClick={handleOpenCheckout}
+                  className="btn btn-primary"
+                  style={{ height: '46px', padding: '0 28px' }}
+                >
+                  RESUME SECURE CHECKOUT
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setCurrentView('shop'); window.history.pushState({}, '', '/'); }}
+                  className="btn btn-primary"
+                  style={{ height: '46px', padding: '0 28px' }}
+                >
+                  EXPLORE SHOP
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
             VIEW: POLICIES
         ======================================================== */}
         {isPolicyView && (
@@ -925,20 +1033,18 @@ export default function App() {
         onClose={() => setCartDrawerOpen(false)}
         cartItems={cartItems}
         onRemoveItem={handleRemoveFromCart}
-        onProceedToCheckout={() => {
-          setCartDrawerOpen(false);
-          setCheckoutModalOpen(true);
-        }}
+        onProceedToCheckout={handleOpenCheckout}
         settings={settings}
       />
 
       <CheckoutModal
         isOpen={checkoutModalOpen}
-        onClose={() => setCheckoutModalOpen(false)}
+        onClose={handleCloseCheckout}
         cartItems={cartItems}
         onOrderSuccess={handleOrderSuccess}
         onOpenPolicy={() => setPolicyModalType('no-return')}
         settings={settings}
+        authUser={authUser}
       />
 
       <SearchModal
