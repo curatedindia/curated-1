@@ -340,17 +340,110 @@ input::placeholder, textarea::placeholder {
   animation-play-state: paused;
 }
 
-/* Responsive grid layout */
+/* Responsive layout & mobile optimizations */
 .container {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 16px;
 }
 
 @media (min-width: 768px) {
   .container {
     padding: 0 32px;
   }
+}
+
+/* 2-Column High-Impact Product Grid on Mobile, Multi-column on Desktop */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
+/* Category cards grid */
+.category-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .category-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .category-card-item {
+    height: 180px !important;
+  }
+}
+
+/* Smooth Horizontal Swiping Row for Mobile Filter Pills */
+.mobile-scroll-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 4px;
+}
+.mobile-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* Product Detail Modal Mobile Styles */
+.product-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 36px;
+  padding: 28px;
+}
+
+@media (max-width: 640px) {
+  .product-modal-dialog {
+    max-height: 100vh !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+  .product-modal-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    padding: 20px 16px 110px !important;
+  }
+  .product-modal-actions-sticky {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    padding: 12px 16px max(14px, env(safe-area-inset-bottom)) !important;
+    z-index: 50 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+  }
+}
+
+/* Mobile input text-zoom prevention on iOS */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area padding for mobile home indicator */
+.safe-bottom {
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
 }
 
 .sr-only {

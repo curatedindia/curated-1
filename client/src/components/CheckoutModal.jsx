@@ -177,13 +177,13 @@ export default function CheckoutModal({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(32, 49, 36, 0.65)',
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
       backdropFilter: 'blur(12px)',
       zIndex: 300,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '16px',
+      padding: '12px',
       overflowY: 'auto'
     }}>
       <div
@@ -193,9 +193,9 @@ export default function CheckoutModal({
           maxWidth: '580px',
           maxHeight: '94vh',
           overflowY: 'auto',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-sm)',
           backgroundColor: '#FFFFFF',
-          border: '1px solid var(--border-active)',
+          border: '1px solid var(--border-subtle)',
           boxShadow: 'var(--shadow-lg)',
           margin: 'auto',
           position: 'relative'
@@ -203,7 +203,7 @@ export default function CheckoutModal({
       >
         {/* Header */}
         <div style={{
-          padding: '18px 24px',
+          padding: '16px 20px',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
@@ -212,7 +212,7 @@ export default function CheckoutModal({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="brand-font" style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.1em' }}>CURATED</span>
-              <span style={{ fontSize: '12px', color: 'var(--sage-primary)', fontWeight: 700 }}>SECURE CHECKOUT</span>
+              <span style={{ fontSize: '11px', color: '#121212', fontWeight: 800, letterSpacing: '0.06em' }}>SECURE CHECKOUT</span>
             </div>
             <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Direct Concierge Fulfilment Across India</p>
           </div>
@@ -248,7 +248,7 @@ export default function CheckoutModal({
 
         {/* STEP 1: GUEST DETAILS & ACKNOWLEDGEMENT FORM */}
         {step === 'FORM' && (
-          <form onSubmit={handleProceedToPayment} style={{ padding: '24px' }}>
+          <form onSubmit={handleProceedToPayment} className="safe-bottom" style={{ padding: '20px 16px' }}>
             {/* Order Items Preview */}
             <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '14px', borderRadius: 'var(--radius-sm)', marginBottom: '20px', border: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
@@ -264,13 +264,13 @@ export default function CheckoutModal({
               </div>
               <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '10px', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 700 }}>
                 <span>Final Total (Incl. Express Shipping)</span>
-                <span style={{ color: 'var(--sage-primary)' }}>₹{total.toLocaleString('en-IN')}</span>
+                <span style={{ color: '#121212' }}>₹{total.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
             {/* Delivery Inputs */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--sage-primary)', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.08em', color: '#121212', textTransform: 'uppercase' }}>
                 1. DELIVERY INFORMATION
               </div>
 
@@ -286,12 +286,13 @@ export default function CheckoutModal({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>10-DIGIT MOBILE NUMBER *</label>
                   <input
                     name="mobile"
                     type="tel"
+                    inputMode="tel"
                     required
                     maxLength={10}
                     value={formData.mobile}
@@ -304,6 +305,7 @@ export default function CheckoutModal({
                   <input
                     name="email"
                     type="email"
+                    inputMode="email"
                     required
                     value={formData.email}
                     onChange={handleInputChange}
@@ -324,7 +326,7 @@ export default function CheckoutModal({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>CITY *</label>
                   <input
@@ -350,6 +352,8 @@ export default function CheckoutModal({
                   <input
                     name="pincode"
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     required
                     maxLength={6}
                     value={formData.pincode}
@@ -361,8 +365,8 @@ export default function CheckoutModal({
 
             {/* CK-05: Mandatory Unchecked No Return Policy Checkbox */}
             <div style={{
-              backgroundColor: 'rgba(122, 160, 130, 0.08)',
-              border: '1px solid var(--border-active)',
+              backgroundColor: '#FAFAFA',
+              border: '1px solid #121212',
               borderRadius: 'var(--radius-sm)',
               padding: '14px',
               marginBottom: '22px'
@@ -372,14 +376,14 @@ export default function CheckoutModal({
                   type="checkbox"
                   checked={policyAck}
                   onChange={(e) => setPolicyAck(e.target.checked)}
-                  style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: 'var(--sage-primary)', flexShrink: 0 }}
+                  style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#121212', flexShrink: 0 }}
                 />
                 <span style={{ fontSize: '12px', lineHeight: 1.5, color: 'var(--text-primary)' }}>
                   I understand that CURATED follows a <strong>No Return Policy</strong> and have reviewed the product details, size and condition before placing my order.{' '}
                   <button
                     type="button"
                     onClick={onOpenPolicy}
-                    style={{ background: 'none', border: 'none', color: 'var(--sage-primary)', textDecoration: 'underline', padding: 0, cursor: 'pointer', fontSize: '12px' }}
+                    style={{ background: 'none', border: 'none', color: '#121212', textDecoration: 'underline', padding: 0, cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                   >
                     View policy & exceptions
                   </button>
@@ -401,26 +405,27 @@ export default function CheckoutModal({
 
         {/* STEP 2: SIMULATED INDIAN PAYMENT GATEWAY MODAL (INV-10: 10-Min Hold) */}
         {step === 'GATEWAY' && (
-          <div style={{ padding: '24px' }}>
+          <div className="safe-bottom" style={{ padding: '20px 16px' }}>
             {/* 10-Minute Hold Reservation Banner */}
             <div style={{
-              backgroundColor: 'var(--olive-soft)',
-              border: '1px solid var(--olive-border)',
+              backgroundColor: '#121212',
+              border: '1px solid #121212',
               borderRadius: 'var(--radius-sm)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '20px'
+              marginBottom: '20px',
+              color: '#FFFFFF'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--olive-deep)' }}>
-                <Clock size={18} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={18} color="#FFFFFF" />
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700 }}>RESERVATION ACTIVE</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Piece held exclusively for you</div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.06em' }}>RESERVATION ACTIVE</div>
+                  <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.75)' }}>Piece held exclusively for you</div>
                 </div>
               </div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--olive-deep)', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', fontFamily: 'monospace' }}>
                 {formatTimer(holdSecondsLeft)}
               </div>
             </div>
@@ -435,15 +440,15 @@ export default function CheckoutModal({
                     flex: 1,
                     background: 'none',
                     border: 'none',
-                    padding: '12px',
-                    fontSize: '12px',
+                    padding: '12px 6px',
+                    fontSize: '11.5px',
                     fontWeight: 700,
-                    color: selectedPaymentTab === tab ? 'var(--sage-primary)' : 'var(--text-muted)',
-                    borderBottom: selectedPaymentTab === tab ? '2px solid var(--sage-primary)' : 'none',
+                    color: selectedPaymentTab === tab ? '#121212' : 'var(--text-muted)',
+                    borderBottom: selectedPaymentTab === tab ? '2px solid #121212' : 'none',
                     cursor: 'pointer'
                   }}
                 >
-                  {tab === 'UPI' ? 'UPI / QR CODE' : tab === 'CARD' ? 'CREDIT / DEBIT' : 'NET BANKING'}
+                  {tab === 'UPI' ? 'UPI / QR' : tab === 'CARD' ? 'CARDS' : 'NETBANKING'}
                 </button>
               ))}
             </div>
@@ -455,24 +460,25 @@ export default function CheckoutModal({
                   display: 'inline-block',
                   padding: '16px',
                   backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: 'var(--radius-sm)',
                   marginBottom: '14px'
                 }}>
-                  {/* Clean SVG QR code simulation in Deep Sage */}
+                  {/* Clean SVG QR code simulation in Matte Black */}
                   <svg width="140" height="140" viewBox="0 0 100 100">
                     <rect width="100" height="100" fill="#FFFFFF" />
-                    <rect x="10" y="10" width="30" height="30" fill="#3A5340" />
+                    <rect x="10" y="10" width="30" height="30" fill="#121212" />
                     <rect x="15" y="15" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="20" y="20" width="10" height="10" fill="#3A5340" />
-                    <rect x="60" y="10" width="30" height="30" fill="#3A5340" />
+                    <rect x="20" y="20" width="10" height="10" fill="#121212" />
+                    <rect x="60" y="10" width="30" height="30" fill="#121212" />
                     <rect x="65" y="15" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="70" y="20" width="10" height="10" fill="#3A5340" />
-                    <rect x="10" y="60" width="30" height="30" fill="#3A5340" />
+                    <rect x="70" y="20" width="10" height="10" fill="#121212" />
+                    <rect x="10" y="60" width="30" height="30" fill="#121212" />
                     <rect x="15" y="65" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="20" y="70" width="10" height="10" fill="#3A5340" />
-                    <rect x="50" y="50" width="10" height="10" fill="#3A5340" />
-                    <rect x="60" y="60" width="15" height="15" fill="#3A5340" />
-                    <rect x="80" y="75" width="10" height="15" fill="#3A5340" />
+                    <rect x="20" y="70" width="10" height="10" fill="#121212" />
+                    <rect x="50" y="50" width="10" height="10" fill="#121212" />
+                    <rect x="60" y="60" width="15" height="15" fill="#121212" />
+                    <rect x="80" y="75" width="10" height="15" fill="#121212" />
                   </svg>
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>

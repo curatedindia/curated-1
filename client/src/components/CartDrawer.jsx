@@ -72,7 +72,7 @@ export default function CartDrawer({
           width: '100%',
           maxWidth: '460px',
           height: '100%',
-          backgroundColor: '#FCFBF9',
+          backgroundColor: '#FFFFFF',
           borderLeft: '1px solid var(--border-subtle)',
           display: 'flex',
           flexDirection: 'column',
@@ -195,7 +195,7 @@ export default function CartDrawer({
 
         {/* Footer Summary & Checkout */}
         {cartItems.length > 0 && (
-          <div style={{ padding: '20px', borderTop: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="safe-bottom" style={{ padding: '16px 20px', borderTop: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-secondary)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', fontSize: '13px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
                 <span>Subtotal</span>

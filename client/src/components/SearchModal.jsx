@@ -53,13 +53,13 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(32, 49, 36, 0.65)',
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
       backdropFilter: 'blur(10px)',
       zIndex: 250,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '40px 16px 20px',
+      padding: '24px 12px 20px',
       overflowY: 'auto'
     }}>
       <div style={{ width: '100%', maxWidth: '640px' }}>
@@ -69,13 +69,13 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
           alignItems: 'center',
           gap: '12px',
           backgroundColor: '#FFFFFF',
-          border: '1px solid var(--border-active)',
+          border: '1px solid #121212',
           borderRadius: 'var(--radius-sm)',
           padding: '8px 16px',
           boxShadow: 'var(--shadow-md)',
-          marginBottom: '24px'
+          marginBottom: '20px'
         }}>
-          <Search size={22} color="var(--sage-primary)" />
+          <Search size={20} color="#121212" />
           <input
             autoFocus
             type="text"
@@ -165,11 +165,11 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
                   />
                   <div style={{ flexGrow: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--sage-primary)', fontWeight: 600, textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '11px', color: '#121212', fontWeight: 700, textTransform: 'uppercase' }}>
                         {prod.category_id}
                       </span>
                       {isSold && (
-                        <span style={{ fontSize: '10px', backgroundColor: 'var(--sage-soft)', color: 'var(--sage-primary)', padding: '2px 6px', borderRadius: '2px', fontWeight: 700 }}>
+                        <span style={{ fontSize: '10px', backgroundColor: '#121212', color: '#FFFFFF', padding: '2px 6px', borderRadius: '2px', fontWeight: 700 }}>
                           SOLD OUT
                         </span>
                       )}

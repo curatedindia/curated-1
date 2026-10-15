@@ -275,11 +275,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: '24px'
-                }}>
+                <div className="product-grid">
                   {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).slice(0, 4).map((prod) => (
                     <ProductCard
                       key={prod.id}
@@ -303,7 +299,7 @@ export default function App() {
                   marginBottom: '28px'
                 }}>
                   {/* Category Filter Pills / Tabs */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="mobile-scroll-row">
                     {[
                       { id: 'all', label: 'ALL PIECES' },
                       { id: 't-shirts', label: 'T-SHIRTS' },
@@ -322,10 +318,12 @@ export default function App() {
                           letterSpacing: '0.06em',
                           textTransform: 'uppercase',
                           borderRadius: 'var(--radius-sm)',
-                          backgroundColor: homeTab === tab.id ? '#212121' : '#FFFFFF',
+                          backgroundColor: homeTab === tab.id ? '#121212' : '#FFFFFF',
                           color: homeTab === tab.id ? '#FFFFFF' : 'var(--text-primary)',
-                          border: `1px solid ${homeTab === tab.id ? '#212121' : 'var(--border-subtle)'}`,
+                          border: `1px solid ${homeTab === tab.id ? '#121212' : 'var(--border-subtle)'}`,
                           cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -360,11 +358,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: '24px'
-                }}>
+                <div className="product-grid">
                   {tabProducts.slice(0, 8).map((prod) => (
                     <ProductCard
                       key={prod.id}
@@ -401,11 +395,7 @@ export default function App() {
                   </h2>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '20px'
-                }}>
+                <div className="category-cards-grid">
                   {[
                     {
                       id: 't-shirts',
@@ -443,6 +433,7 @@ export default function App() {
                         setCurrentView('shop');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
+                      className="category-card-item"
                       style={{
                         position: 'relative',
                         height: '280px',
@@ -572,7 +563,7 @@ export default function App() {
               </div>
 
               {/* Faceted Filter Pills */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="mobile-scroll-row" style={{ alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
                 {['', 't-shirts', 'shirts', 'jackets', 'hoodies'].map((cat) => (
                   <button
                     key={cat}
@@ -584,10 +575,12 @@ export default function App() {
                       fontFamily: 'var(--font-btn)',
                       fontWeight: 700,
                       letterSpacing: '0.06em',
-                      background: categoryFilter === cat ? '#212121' : '#FFFFFF',
+                      background: categoryFilter === cat ? '#121212' : '#FFFFFF',
                       color: categoryFilter === cat ? '#FFFFFF' : 'var(--text-primary)',
-                      border: `1px solid ${categoryFilter === cat ? '#212121' : 'var(--border-subtle)'}`,
-                      cursor: 'pointer'
+                      border: `1px solid ${categoryFilter === cat ? '#121212' : 'var(--border-subtle)'}`,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
                     }}
                   >
                     {cat ? cat.toUpperCase() : 'ALL SILHOUETTES'}
@@ -597,7 +590,7 @@ export default function App() {
                 <select
                   value={conditionFilter}
                   onChange={(e) => setConditionFilter(e.target.value)}
-                  style={{ width: 'auto', minHeight: '34px', padding: '4px 10px', fontSize: '11px', borderRadius: 'var(--radius-sm)' }}
+                  style={{ width: 'auto', minHeight: '34px', padding: '4px 10px', fontSize: '11px', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
                 >
                   <option value="">Condition: All</option>
                   <option value="New / Unused">New / Unused</option>
@@ -608,7 +601,7 @@ export default function App() {
                 {(categoryFilter || conditionFilter || fitFilter) && (
                   <button
                     onClick={() => { setCategoryFilter(''); setConditionFilter(''); setFitFilter(''); }}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent-red)', fontSize: '11.5px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'var(--font-btn)', fontWeight: 600 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent-red)', fontSize: '11.5px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'var(--font-btn)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                   >
                     Clear Filters ×
                   </button>
@@ -640,11 +633,7 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                gap: '24px'
-              }}>
+              <div className="product-grid">
                 {availableShopProducts.map((prod) => (
                   <ProductCard
                     key={prod.id}
@@ -684,11 +673,7 @@ export default function App() {
               </h1>
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-              gap: '24px'
-            }}>
+            <div className="product-grid">
               {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).map((prod) => (
                 <ProductCard
                   key={prod.id}

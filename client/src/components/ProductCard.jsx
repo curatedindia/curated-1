@@ -160,9 +160,10 @@ export default function ProductCard({ product, onSelectProduct }) {
           </div>
         </div>
 
-        {/* Quick View Floating Pill on hover */}
+        {/* Quick View Floating Pill on hover (Desktop only) */}
         {!isSoldOut && (
           <div
+            className="desktop-only"
             style={{
               position: 'absolute',
               bottom: '10px',
@@ -194,24 +195,29 @@ export default function ProductCard({ product, onSelectProduct }) {
         )}
       </div>
 
-      {/* Product Details Section (Future Saints Typography & Price Layout) */}
-      <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+      {/* Product Details Section (Mobile Optimized 2-Col Layout) */}
+      <div style={{ padding: '12px 10px 14px', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
           <h3 style={{
-            fontSize: '14px',
+            fontSize: 'clamp(12.5px, 3.4vw, 14px)',
             fontFamily: 'var(--font-body)',
             fontWeight: 600,
             textTransform: 'none',
             letterSpacing: '0.01em',
             color: 'var(--text-primary)',
-            lineHeight: 1.35
+            lineHeight: 1.35,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            minHeight: '34px'
           }}>
             {product.name}
           </h3>
         </div>
 
         {/* Condition Grade and Size */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '10.5px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 500 }}>{product.condition}</span>
           {sizeLabel && (
             <>
@@ -222,9 +228,9 @@ export default function ProductCard({ product, onSelectProduct }) {
         </div>
 
         {/* Pricing (Future Saints Rs. Format) */}
-        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{
-            fontSize: '15px',
+            fontSize: 'clamp(13.5px, 3.6vw, 15px)',
             fontWeight: 700,
             fontFamily: 'var(--font-body)',
             color: 'var(--text-primary)'
@@ -233,7 +239,7 @@ export default function ProductCard({ product, onSelectProduct }) {
           </span>
           {hasDiscount && (
             <span style={{
-              fontSize: '12.5px',
+              fontSize: '11.5px',
               color: 'var(--text-muted)',
               textDecoration: 'line-through'
             }}>

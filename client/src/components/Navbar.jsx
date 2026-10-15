@@ -48,7 +48,7 @@ export default function Navbar({
         height: '79px'
       }}>
         {/* Left Side: Brand Logo in Left Corner + Mobile Hamburger */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {/* Mobile Hamburger Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -56,7 +56,7 @@ export default function Navbar({
             style={{
               display: 'flex',
               background: 'transparent',
-              padding: '8px',
+              padding: '6px',
               color: 'var(--text-primary)',
               border: 'none',
               cursor: 'pointer'
@@ -77,7 +77,7 @@ export default function Navbar({
           >
             <span style={{
               fontFamily: 'var(--font-heading)',
-              fontSize: '24px',
+              fontSize: 'clamp(20px, 4.5vw, 24px)',
               fontWeight: 800,
               letterSpacing: '0.14em',
               color: '#121212',
@@ -116,7 +116,7 @@ export default function Navbar({
         </div>
 
         {/* Right Side: Search + Admin + Cart */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
 
           {/* Search Trigger */}
           <button
@@ -132,12 +132,13 @@ export default function Navbar({
               alignItems: 'center'
             }}
           >
-            <Search size={19} />
+            <Search size={20} />
           </button>
 
-          {/* Quick Admin Toggle */}
+          {/* Quick Admin Toggle (Desktop) */}
           <button
             onClick={() => handleNavClick(isAdmin ? 'shop' : 'admin')}
+            className="desktop-only"
             style={{
               padding: '6px 12px',
               fontSize: '11px',
@@ -168,11 +169,11 @@ export default function Navbar({
               border: '1px solid #121212',
               color: '#FFFFFF',
               borderRadius: 'var(--radius-sm)',
-              padding: '7px 14px',
+              padding: '7px 12px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '6px'
             }}
           >
             <ShoppingBag size={15} color="#FFFFFF" />
@@ -185,21 +186,24 @@ export default function Navbar({
 
       {/* Mobile Drawer Navigation Menu */}
       {mobileMenuOpen && (
-        <div style={{
-          position: 'fixed',
-          top: '74px',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: '#FFFFFF',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          zIndex: 99,
-          borderTop: '1px solid var(--border-subtle)',
-          overflowY: 'auto'
-        }}>
+        <div
+          className="safe-bottom"
+          style={{
+            position: 'fixed',
+            top: '79px',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#FFFFFF',
+            padding: '24px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            zIndex: 99,
+            borderTop: '1px solid var(--border-subtle)',
+            overflowY: 'auto'
+          }}
+        >
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -208,7 +212,7 @@ export default function Navbar({
                 background: 'transparent',
                 border: 'none',
                 textAlign: 'left',
-                fontSize: '16px',
+                fontSize: '15px',
                 fontWeight: 700,
                 fontFamily: 'var(--font-heading)',
                 letterSpacing: '0.06em',
@@ -226,7 +230,35 @@ export default function Navbar({
             </button>
           ))}
 
-          <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
+          {/* Mobile Admin Portal Entry */}
+          <button
+            onClick={() => handleNavClick(isAdmin ? 'shop' : 'admin')}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-sm)',
+              textAlign: 'left',
+              fontSize: '13px',
+              fontWeight: 700,
+              fontFamily: 'var(--font-btn)',
+              letterSpacing: '0.06em',
+              color: '#121212',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              marginTop: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={16} color="#121212" />
+              <span>ADMIN PORTAL</span>
+            </div>
+            <ArrowRight size={14} color="#121212" />
+          </button>
+
+          <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' }}>
             <p style={{ fontSize: '11px', color: '#121212', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' }}>
               CURATED CONCIERGE
             </p>

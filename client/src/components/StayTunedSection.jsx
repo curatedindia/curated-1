@@ -120,9 +120,10 @@ export default function StayTunedSection() {
               justifyContent: 'center'
             }}
           >
-            <div style={{ position: 'relative', flex: '1 1 260px' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px', width: '100%' }}>
               <input
                 type="email"
+                inputMode="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -131,7 +132,7 @@ export default function StayTunedSection() {
                   width: '100%',
                   height: '48px',
                   padding: '0 16px',
-                  fontSize: '13px',
+                  fontSize: '14px',
                   backgroundColor: '#FFFFFF',
                   color: '#121212',
                   border: '1px solid #FFFFFF',
@@ -159,8 +160,9 @@ export default function StayTunedSection() {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
-                flexShrink: 0
+                flex: '1 1 140px'
               }}
             >
               <span>{submitting ? 'JOINING...' : 'NOTIFY ME'}</span>

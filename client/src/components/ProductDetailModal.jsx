@@ -77,7 +77,7 @@ export default function ProductDetailModal({
       overflowY: 'auto'
     }}>
       <div
-        className="glass-panel"
+        className="glass-panel product-modal-dialog"
         style={{
           width: '100%',
           maxWidth: '1040px',
@@ -97,8 +97,8 @@ export default function ProductDetailModal({
           aria-label="Close details"
           style={{
             position: 'absolute',
-            top: '16px',
-            right: '16px',
+            top: '14px',
+            right: '14px',
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
             color: 'var(--text-primary)',
@@ -109,18 +109,13 @@ export default function ProductDetailModal({
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            zIndex: 10
+            zIndex: 20
           }}
         >
           <X size={20} />
         </button>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '36px',
-          padding: '28px'
-        }}>
+        <div className="product-modal-grid">
           {/* Left Column: Image Gallery */}
           <div>
             {/* Main Stage Image */}
@@ -153,8 +148,8 @@ export default function ProductDetailModal({
                   top: '14px',
                   left: '14px',
                   backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  border: '1px solid var(--sage-primary)',
-                  color: 'var(--sage-primary)',
+                  border: '1px solid #121212',
+                  color: '#121212',
                   padding: '4px 10px',
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '11px',
@@ -164,7 +159,7 @@ export default function ProductDetailModal({
                   gap: '5px',
                   boxShadow: 'var(--shadow-sm)'
                 }}>
-                  <Sparkles size={12} color="var(--sage-primary)" />
+                  <Sparkles size={12} color="#121212" />
                   NEW DROP
                 </div>
               )}
@@ -183,7 +178,7 @@ export default function ProductDetailModal({
                       borderRadius: 'var(--radius-sm)',
                       overflow: 'hidden',
                       padding: 0,
-                      border: activeImageIndex === idx ? '2px solid var(--sage-primary)' : '1px solid var(--border-subtle)',
+                      border: activeImageIndex === idx ? '2px solid #121212' : '1px solid var(--border-subtle)',
                       cursor: 'pointer',
                       flexShrink: 0,
                       background: 'none'
@@ -388,43 +383,45 @@ export default function ProductDetailModal({
             )}
 
             {/* Action Button: Add to Cart OR Sold Out Navigation */}
-            {isSoldOut ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
-                <div style={{
-                  padding: '14px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  textAlign: 'center',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  color: 'var(--text-secondary)'
-                }}>
-                  PIECE SOLD OUT {product.pieces_sold > 0 && `(${product.pieces_sold} sold)`}
+            <div className="product-modal-actions-sticky">
+              {isSoldOut ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{
+                    padding: '14px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    textAlign: 'center',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    PIECE SOLD OUT {product.pieces_sold > 0 && `(${product.pieces_sold} sold)`}
+                  </div>
+                  <button
+                    onClick={() => { onClose(); onNavigateToNewDrops(); }}
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                  >
+                    EXPLORE NEW DROPS
+                  </button>
                 </div>
-                <button
-                  onClick={() => { onClose(); onNavigateToNewDrops(); }}
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
-                >
-                  EXPLORE NEW DROPS
-                </button>
-              </div>
-            ) : (
-              <div style={{ marginBottom: '14px' }}>
-                <button
-                  onClick={() => {
-                    onAddToCart(product, selectedVariant);
-                    onClose();
-                  }}
-                  disabled={isHeld || selectedVariant?.available <= 0}
-                  className="btn btn-primary"
-                  style={{ width: '100%', height: '50px', fontSize: '14px' }}
-                >
-                  {isHeld ? 'UNAVAILABLE RIGHT NOW' : 'ADD TO CART'}
-                </button>
-              </div>
-            )}
+              ) : (
+                <div>
+                  <button
+                    onClick={() => {
+                      onAddToCart(product, selectedVariant);
+                      onClose();
+                    }}
+                    disabled={isHeld || selectedVariant?.available <= 0}
+                    className="btn btn-primary"
+                    style={{ width: '100%', height: '50px', fontSize: '14px' }}
+                  >
+                    {isHeld ? 'UNAVAILABLE RIGHT NOW' : 'ADD TO CART'}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Visible Mandatory No Return Policy Link */}
             <div style={{ textAlign: 'center', marginBottom: '22px' }}>
