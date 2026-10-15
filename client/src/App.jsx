@@ -6,6 +6,7 @@ import ProductCard from './components/ProductCard';
 import ProductDetailModal from './components/ProductDetailModal';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
+import CheckoutPage from './components/CheckoutPage';
 import SearchModal from './components/SearchModal';
 import TrackOrderView from './components/TrackOrderView';
 import SoldOutView from './components/SoldOutView';
@@ -255,10 +256,10 @@ export default function App() {
       const hash = window.location.hash;
       const search = window.location.search;
 
-      // Automatically redirect/open checkout if user lands on /checkout or returns from OAuth
+      // Automatically navigate to dedicated CheckoutPage if user lands on /checkout or returns from OAuth
       if (pathname === '/checkout' || hash.includes('access_token') || search.includes('code=')) {
         setCurrentView('checkout');
-        setCheckoutModalOpen(true);
+        setCheckoutModalOpen(false);
       } else if (pathname === '' || pathname === '/') {
         if (currentView === 'checkout') {
           setCurrentView('home');
@@ -277,7 +278,7 @@ export default function App() {
         const path = window.location.pathname.replace(/\/+$/, '');
         if (path === '/checkout' || window.location.hash.includes('access_token')) {
           setCurrentView('checkout');
-          setCheckoutModalOpen(true);
+          setCheckoutModalOpen(false);
         }
       } else if (event === 'SIGNED_OUT') {
         setAuthUser(null);
@@ -299,7 +300,7 @@ export default function App() {
 
   const handleOpenCheckout = () => {
     setCartDrawerOpen(false);
-    setCheckoutModalOpen(true);
+    setCheckoutModalOpen(false);
     setCurrentView('checkout');
     if (window.location.pathname !== '/checkout') {
       window.history.pushState({}, '', '/checkout');
@@ -969,36 +970,17 @@ export default function App() {
         {/* ========================================================
             VIEW: CHECKOUT (/checkout)
         ======================================================== */}
-        {currentView === 'checkout' && !checkoutModalOpen && (
-          <div className="container" style={{ padding: '80px 20px', maxWidth: '640px', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px' }}>
-              CHECKOUT
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>
-              {cartItems.length > 0
-                ? `You have ${cartItems.length} curated piece${cartItems.length > 1 ? 's' : ''} in your bag.`
-                : 'Your bag is currently empty.'}
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-              {cartItems.length > 0 ? (
-                <button
-                  onClick={handleOpenCheckout}
-                  className="btn btn-primary"
-                  style={{ height: '46px', padding: '0 28px' }}
-                >
-                  RESUME SECURE CHECKOUT
-                </button>
-              ) : (
-                <button
-                  onClick={() => { setCurrentView('shop'); window.history.pushState({}, '', '/'); }}
-                  className="btn btn-primary"
-                  style={{ height: '46px', padding: '0 28px' }}
-                >
-                  EXPLORE SHOP
-                </button>
-              )}
-            </div>
-          </div>
+        {currentView === 'checkout' && (
+          <CheckoutPage
+            onBackToShop={() => {
+              setCurrentView('shop');
+              window.history.pushState({}, '', '/');
+            }}
+            onOrderPlaced={() => {
+              handleOrderSuccess();
+            }}
+            settings={settings}
+          />
         )}
 
         {/* ========================================================
