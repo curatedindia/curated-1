@@ -1412,10 +1412,14 @@ if (fs.existsSync(CLIENT_DIST)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(` CURATED Server running at: http://localhost:${PORT}`);
-  console.log(` Single source of truth ledger initialized.`);
-  console.log(` Concurrency lock & hold expiry workers active.`);
-  console.log(`====================================================`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(` CURATED Server running at: http://localhost:${PORT}`);
+    console.log(` Single source of truth ledger initialized.`);
+    console.log(` Concurrency lock & hold expiry workers active.`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = app;

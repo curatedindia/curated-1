@@ -26,11 +26,192 @@ import {
   Eye
 } from 'lucide-react';
 
+const CURATED_INITIAL_PRODUCTS = [
+  {
+    id: 'prod-001',
+    sku: 'CUR-TS-001',
+    name: 'Heavyweight Washed Vintage Boxy Tee',
+    slug: 'heavyweight-washed-vintage-boxy-tee',
+    category_id: 't-shirts',
+    subcategory_id: 'oversized',
+    description: 'Handpicked heavyweight cotton tee with a natural mineral wash. Dropped shoulders, reinforced double-needle collar, and zero side seams. Sourced from export surplus sample run.',
+    fabric: '100% Ring-Spun Heavyweight Cotton (240 GSM)',
+    fit: 'Oversized Boxy',
+    care: 'Machine wash cold inside out, hang dry only.',
+    condition: 'New / Unused',
+    condition_notes: 'Pristine unworn condition. Crisp neckline with zero stretching.',
+    selling_price: 899,
+    original_price: 1899,
+    is_new_drop: true,
+    status: 'ACTIVE',
+    images: ['/products/man_boxy_tee.jpg'],
+    variants: [
+      {
+        id: 'var-001',
+        product_id: 'prod-001',
+        size: 'L',
+        measurements: { chest: 46, length: 29.5, shoulder: 21, sleeve: 9.5, unit: 'in' },
+        on_hand: 1,
+        available: 1,
+        stock_on_hand: 1,
+        reserved: 0
+      }
+    ],
+    total_on_hand: 1,
+    total_available: 1,
+    pieces_sold: 0
+  },
+  {
+    id: 'prod-003',
+    sku: 'CUR-SH-001',
+    name: 'Oversized Minimalist Utility Work Shirt',
+    slug: 'oversized-minimalist-utility-work-shirt',
+    category_id: 'shirts',
+    subcategory_id: 'workwear',
+    description: 'Relaxed drop-shoulder utility shirt in a crisp monochrome twill. Dual chest bellows pockets, matte buttons, and clean boxy drape.',
+    fabric: 'Heavyweight Cotton Twill (210 GSM)',
+    fit: 'Boxy / Relaxed',
+    care: 'Machine wash cold with like colors, hang dry.',
+    condition: 'New / Unused',
+    condition_notes: 'Crisp hand feel, reinforced collar and pocket stitching.',
+    selling_price: 1299,
+    original_price: 2499,
+    is_new_drop: true,
+    status: 'ACTIVE',
+    images: ['/products/man_utility_shirt.jpg'],
+    variants: [
+      {
+        id: 'var-003',
+        product_id: 'prod-003',
+        size: 'XL',
+        measurements: { chest: 48, length: 30, shoulder: 22, sleeve: 24.5, unit: 'in' },
+        on_hand: 1,
+        available: 1,
+        stock_on_hand: 1,
+        reserved: 0
+      }
+    ],
+    total_on_hand: 1,
+    total_available: 1,
+    pieces_sold: 0
+  },
+  {
+    id: 'prod-006',
+    sku: 'CUR-HD-001',
+    name: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie',
+    slug: 'pigment-dyed-french-terry-drop-shoulder-hoodie',
+    category_id: 'hoodies',
+    subcategory_id: 'heavyweight',
+    description: 'Ultra-heavyweight 420 GSM French Terry hoodie in matte black. Dropped shoulders, double-layer hood without drawstrings, and tailored boxy hem.',
+    fabric: '100% French Terry Cotton (420 GSM)',
+    fit: 'Oversized / Dropped Shoulder',
+    care: 'Machine wash cold inside out, hang dry only.',
+    condition: 'New / Unused',
+    condition_notes: 'Flawless heavyweight structure with dense ribbing.',
+    selling_price: 1599,
+    original_price: 3299,
+    is_new_drop: true,
+    status: 'ACTIVE',
+    images: ['/products/man_street_hoodie.jpg'],
+    variants: [
+      {
+        id: 'var-006',
+        product_id: 'prod-006',
+        size: 'L',
+        measurements: { chest: 48, length: 28, shoulder: 23, sleeve: 25, unit: 'in' },
+        on_hand: 1,
+        available: 1,
+        stock_on_hand: 1,
+        reserved: 0
+      }
+    ],
+    total_on_hand: 1,
+    total_available: 1,
+    pieces_sold: 0
+  },
+  {
+    id: 'prod-sold-001',
+    sku: 'CUR-HD-002',
+    name: 'Acid-Washed Distressed Heavyweight Hoodie',
+    slug: 'acid-washed-distressed-heavyweight-hoodie',
+    category_id: 'hoodies',
+    subcategory_id: 'archival',
+    description: 'Archival mineral acid-washed charcoal black hoodie with subtle edge grinding and sun-faded patina. One of one vintage piece.',
+    fabric: '100% Heavyweight Cotton Terry (400 GSM)',
+    fit: 'Relaxed Vintage Fit',
+    care: 'Dry clean or gentle hand wash cold.',
+    condition: 'Excellent - Pre-Owned',
+    condition_notes: 'Natural vintage fade, distressed cuffs, verified authentic archival garment.',
+    selling_price: 1699,
+    original_price: 3499,
+    is_new_drop: false,
+    status: 'SOLD_OUT',
+    images: ['/products/man_sold_hoodie.jpg'],
+    variants: [
+      {
+        id: 'var-sold-001',
+        product_id: 'prod-sold-001',
+        size: 'M',
+        measurements: { chest: 44, length: 27, shoulder: 20.5, sleeve: 24, unit: 'in' },
+        on_hand: 0,
+        available: 0,
+        stock_on_hand: 0,
+        reserved: 0
+      }
+    ],
+    total_on_hand: 0,
+    total_available: 0,
+    pieces_sold: 1
+  },
+  {
+    id: 'prod-sold-002',
+    sku: 'CUR-SH-002',
+    name: 'Archival Faded Black Twill Workwear Overshirt',
+    slug: 'archival-faded-black-twill-workwear-overshirt',
+    category_id: 'shirts',
+    subcategory_id: 'vintage',
+    description: 'Boxy twill utility workwear shirt with dual chest flap pockets and tonal buttons in vintage faded black.',
+    fabric: 'Heavy Duty 100% Cotton Twill',
+    fit: 'Boxy Overshirt',
+    care: 'Machine wash cold with like colors, hang dry.',
+    condition: 'Excellent - Pre-Owned',
+    condition_notes: 'Clean vintage wash with beautifully softened twill fabric. All buttons intact.',
+    selling_price: 1399,
+    original_price: 2799,
+    is_new_drop: false,
+    status: 'SOLD_OUT',
+    images: ['/products/man_sold_shirt.jpg'],
+    variants: [
+      {
+        id: 'var-sold-002',
+        product_id: 'prod-sold-002',
+        size: 'L',
+        measurements: { chest: 46, length: 29, shoulder: 21, sleeve: 25, unit: 'in' },
+        on_hand: 0,
+        available: 0,
+        stock_on_hand: 0,
+        reserved: 0
+      }
+    ],
+    total_on_hand: 0,
+    total_available: 0,
+    pieces_sold: 1
+  }
+];
+
+const DEFAULT_SETTINGS = {
+  store_name: 'CURATED',
+  sold_out_section_enabled: true,
+  shipping_free_threshold: 1499,
+  shipping_flat_rate: 99,
+  hero_headline: 'CURATED | SEARCHED • FILTERED • QUALITY CHECKED • HANDPICKED'
+};
+
 export default function App() {
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'shop' | 'new-drops' | 'sold-out' | 'track-order' | 'about' | 'contact' | 'admin' | 'policy-*'
-  const [products, setProducts] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(CURATED_INITIAL_PRODUCTS);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(false);
 
   // Filters & Sorting state
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -84,10 +265,10 @@ export default function App() {
         setRes.json()
       ]);
 
-      if (prodData.success) {
+      if (prodData && prodData.success && Array.isArray(prodData.products) && prodData.products.length > 0) {
         setProducts(prodData.products);
       }
-      if (setData.success) {
+      if (setData && setData.success && setData.settings) {
         setSettings(setData.settings);
       }
     } catch (err) {

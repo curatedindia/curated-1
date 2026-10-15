@@ -45,8 +45,7 @@ function getInitialData() {
       is_new_drop: true,
       status: 'ACTIVE',
       images: [
-        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80',
-        'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=1000&q=80'
+        '/products/man_boxy_tee.jpg'
       ],
       seo_title: 'Heavyweight Washed Vintage Boxy Tee | CURATED',
       seo_description: 'Handpicked heavyweight 240 GSM washed boxy tee. One of one vintage silhouette in pristine unused condition.',
@@ -113,8 +112,7 @@ function getInitialData() {
       is_new_drop: true,
       status: 'ACTIVE',
       images: [
-        'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=1000&q=80',
-        'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=1000&q=80'
+        '/products/man_utility_shirt.jpg'
       ],
       seo_title: 'Oversized Raw Indigo Utility Work Shirt | CURATED',
       seo_description: 'Heavy twill double-pocket raw indigo utility shirt. Curated one-of-one piece.',
@@ -215,8 +213,7 @@ function getInitialData() {
       is_new_drop: true,
       status: 'ACTIVE',
       images: [
-        'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80',
-        'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?auto=format&fit=crop&w=1000&q=80'
+        '/products/man_street_hoodie.jpg'
       ],
       seo_title: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie | CURATED',
       seo_description: '420 GSM heavyweight French Terry hoodie in washed charcoal. Structural luxury fit.',

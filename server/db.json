@@ -25,8 +25,7 @@
       "is_new_drop": true,
       "status": "ACTIVE",
       "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80",
-        "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=1000&q=80"
+        "/products/man_boxy_tee.jpg"
       ],
       "seo_title": "Heavyweight Washed Vintage Boxy Tee | CURATED",
       "seo_description": "Handpicked heavyweight 240 GSM washed boxy tee. One of one vintage silhouette in pristine unused condition.",
@@ -71,7 +70,7 @@
     {
       "id": "prod-003",
       "sku": "CUR-SH-001",
-      "name": "Oversized Raw Indigo Utility Work Shirt",
+      "name": "Oversized Minimalist Utility Work Shirt",
       "slug": "oversized-raw-indigo-utility-work-shirt",
       "category_id": "shirts",
       "subcategory_id": "oversized",
@@ -93,8 +92,7 @@
       "is_new_drop": true,
       "status": "ACTIVE",
       "images": [
-        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=1000&q=80",
-        "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=1000&q=80"
+        "/products/man_utility_shirt.jpg"
       ],
       "seo_title": "Oversized Raw Indigo Utility Work Shirt | CURATED",
       "seo_description": "Heavy twill double-pocket raw indigo utility shirt. Curated one-of-one piece.",
@@ -193,10 +191,9 @@
       "qc_passed": true,
       "qc_notes": "Kangaroo pocket bartacks inspected, hood drawcord tips checked.",
       "is_new_drop": true,
-      "status": "SOLD_OUT",
+      "status": "ACTIVE",
       "images": [
-        "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80",
-        "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?auto=format&fit=crop&w=1000&q=80"
+        "/products/man_street_hoodie.jpg"
       ],
       "seo_title": "Pigment-Dyed French Terry Drop-Shoulder Hoodie | CURATED",
       "seo_description": "420 GSM heavyweight French Terry hoodie in washed charcoal. Structural luxury fit.",
@@ -271,268 +268,70 @@
       "sold_at": "2026-08-20T17:45:00.000Z"
     },
     {
-      "id": "prod-test-1791047630086",
-      "sku": "TEST-P0-0086",
-      "name": "Concurrency Race Test Tee (TEST-P0-0086)",
-      "slug": "concurrency-test-1791047630086",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-03",
+      "id": "prod-sold-001",
+      "sku": "CUR-HD-002",
+      "name": "Acid-Washed Distressed Heavyweight Hoodie",
+      "slug": "acid-washed-distressed-heavyweight-hoodie",
+      "category_id": "hoodies",
+      "subcategory_id": "archival",
+      "description": "Archival mineral acid-washed charcoal black hoodie with subtle edge grinding and sun-faded patina. One of one vintage piece.",
+      "fabric": "100% Heavyweight Cotton Terry (400 GSM)",
+      "fit": "Relaxed Vintage Fit",
+      "care": "Dry clean or gentle hand wash cold.",
+      "condition": "Excellent - Pre-Owned",
+      "condition_notes": "Natural vintage fade, distressed cuffs, verified authentic archival garment.",
+      "selling_price": 1699,
+      "original_price": 3499,
+      "cost_price": 700,
+      "source_type": "Archival Lot",
+      "source_name": "Tokyo Curated Archive Lot #8",
+      "lot_ref": "LOT-2026-ARCH-01",
+      "acquisition_date": "2026-09-15",
       "qc_passed": true,
-      "qc_notes": "UAT Test",
+      "qc_notes": "All seams verified intact. Premium heavyweight drape.",
       "is_new_drop": false,
       "status": "SOLD_OUT",
       "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
+        "/products/man_sold_hoodie.jpg"
       ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-03T17:13:50.086Z",
-      "listed_at": "2026-10-03T17:13:50.086Z",
-      "sold_at": "2026-10-03T17:13:50.087Z"
+      "seo_title": "Acid-Washed Distressed Heavyweight Hoodie | CURATED",
+      "seo_description": "Archival acid-washed heavyweight hoodie. One-of-one physical garment.",
+      "created_at": "2026-09-20T10:00:00.000Z",
+      "listed_at": "2026-09-20T10:00:00.000Z",
+      "sold_at": "2026-10-02T12:00:00.000Z"
     },
     {
-      "id": "prod-test-1791126409091",
-      "sku": "TEST-P0-9091",
-      "name": "Concurrency Race Test Tee (TEST-P0-9091)",
-      "slug": "concurrency-test-1791126409091",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-04",
+      "id": "prod-sold-002",
+      "sku": "CUR-SH-002",
+      "name": "Archival Faded Black Twill Workwear Overshirt",
+      "slug": "archival-faded-black-twill-workwear-overshirt",
+      "category_id": "shirts",
+      "subcategory_id": "vintage",
+      "description": "Boxy twill utility workwear shirt with dual chest flap pockets and tonal buttons in vintage faded black.",
+      "fabric": "Heavy Duty 100% Cotton Twill",
+      "fit": "Boxy Overshirt",
+      "care": "Machine wash cold with like colors, hang dry.",
+      "condition": "Excellent - Pre-Owned",
+      "condition_notes": "Clean vintage wash with beautifully softened twill fabric. All buttons intact.",
+      "selling_price": 1399,
+      "original_price": 2799,
+      "cost_price": 520,
+      "source_type": "Archival Lot",
+      "source_name": "Milan Vintage Warehouse Lot #2",
+      "lot_ref": "LOT-2026-ARCH-02",
+      "acquisition_date": "2026-09-18",
       "qc_passed": true,
-      "qc_notes": "UAT Test",
+      "qc_notes": "Zero fraying or missing buttons. Inspected and approved.",
       "is_new_drop": false,
       "status": "SOLD_OUT",
       "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
+        "/products/man_sold_shirt.jpg"
       ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-04T15:06:49.091Z",
-      "listed_at": "2026-10-04T15:06:49.091Z",
-      "sold_at": "2026-10-04T15:06:49.093Z"
-    },
-    {
-      "id": "prod-test-1791913511525",
-      "sku": "TEST-P0-1524",
-      "name": "Concurrency Race Test Tee (TEST-P0-1524)",
-      "slug": "concurrency-test-1791913511525",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:11.525Z",
-      "listed_at": "2026-10-13T17:45:11.525Z",
-      "sold_at": "2026-10-13T17:45:11.538Z"
-    },
-    {
-      "id": "prod-test-1791913513054",
-      "sku": "TEST-P0-3054",
-      "name": "Concurrency Race Test Tee (TEST-P0-3054)",
-      "slug": "concurrency-test-1791913513054",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:13.054Z",
-      "listed_at": "2026-10-13T17:45:13.054Z",
-      "sold_at": "2026-10-13T17:45:13.056Z"
-    },
-    {
-      "id": "prod-test-1791913514072",
-      "sku": "TEST-P0-4072",
-      "name": "Concurrency Race Test Tee (TEST-P0-4072)",
-      "slug": "concurrency-test-1791913514072",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:14.072Z",
-      "listed_at": "2026-10-13T17:45:14.072Z",
-      "sold_at": "2026-10-13T17:45:14.072Z"
-    },
-    {
-      "id": "prod-test-1791913515098",
-      "sku": "TEST-P0-5098",
-      "name": "Concurrency Race Test Tee (TEST-P0-5098)",
-      "slug": "concurrency-test-1791913515098",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:15.098Z",
-      "listed_at": "2026-10-13T17:45:15.098Z",
-      "sold_at": "2026-10-13T17:45:15.099Z"
-    },
-    {
-      "id": "prod-test-1791913515958",
-      "sku": "TEST-P0-5957",
-      "name": "Concurrency Race Test Tee (TEST-P0-5957)",
-      "slug": "concurrency-test-1791913515958",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:15.958Z",
-      "listed_at": "2026-10-13T17:45:15.958Z",
-      "sold_at": "2026-10-13T17:45:15.958Z"
-    },
-    {
-      "id": "prod-test-1791913516739",
-      "sku": "TEST-P0-6739",
-      "name": "Concurrency Race Test Tee (TEST-P0-6739)",
-      "slug": "concurrency-test-1791913516739",
-      "category_id": "t-shirts",
-      "subcategory_id": "plain",
-      "description": "Automated UAT-14 Concurrency verification unit.",
-      "fabric": "100% Cotton",
-      "fit": "Regular",
-      "care": "Wash cold",
-      "condition": "New / Unused",
-      "condition_notes": "Test artifact",
-      "selling_price": 599,
-      "original_price": 999,
-      "cost_price": 250,
-      "source_type": "Brand Surplus",
-      "source_name": "Test Rig",
-      "lot_ref": "UAT-14",
-      "acquisition_date": "2026-10-13",
-      "qc_passed": true,
-      "qc_notes": "UAT Test",
-      "is_new_drop": false,
-      "status": "SOLD_OUT",
-      "images": [
-        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80"
-      ],
-      "seo_title": "Test",
-      "seo_description": "Test",
-      "created_at": "2026-10-13T17:45:16.739Z",
-      "listed_at": "2026-10-13T17:45:16.739Z",
-      "sold_at": "2026-10-13T17:45:16.740Z"
+      "seo_title": "Archival Faded Black Twill Workwear Overshirt | CURATED",
+      "seo_description": "Archival twill workwear overshirt in vintage faded black.",
+      "created_at": "2026-09-22T10:00:00.000Z",
+      "listed_at": "2026-09-22T10:00:00.000Z",
+      "sold_at": "2026-10-04T15:30:00.000Z"
     }
   ],
   "variants": [
@@ -612,7 +411,7 @@
         "sleeve": 24.5,
         "unit": "in"
       },
-      "stock_on_hand": 0
+      "stock_on_hand": 1
     },
     {
       "id": "var-007",
@@ -641,105 +440,27 @@
       "stock_on_hand": 0
     },
     {
-      "id": "var-test-1791047630086",
-      "product_id": "prod-test-1791047630086",
+      "id": "var-sold-001",
+      "product_id": "prod-sold-001",
       "size": "M",
       "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
+        "chest": 44,
+        "length": 27,
+        "shoulder": 20.5,
+        "sleeve": 24,
         "unit": "in"
       },
       "stock_on_hand": 0
     },
     {
-      "id": "var-test-1791126409091",
-      "product_id": "prod-test-1791126409091",
-      "size": "M",
+      "id": "var-sold-002",
+      "product_id": "prod-sold-002",
+      "size": "L",
       "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913511525",
-      "product_id": "prod-test-1791913511525",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913513054",
-      "product_id": "prod-test-1791913513054",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913514072",
-      "product_id": "prod-test-1791913514072",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913515099",
-      "product_id": "prod-test-1791913515098",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913515958",
-      "product_id": "prod-test-1791913515958",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
-        "unit": "in"
-      },
-      "stock_on_hand": 0
-    },
-    {
-      "id": "var-test-1791913516739",
-      "product_id": "prod-test-1791913516739",
-      "size": "M",
-      "measurements": {
-        "chest": 42,
-        "length": 28,
-        "shoulder": 19,
-        "sleeve": 9,
+        "chest": 46,
+        "length": 29,
+        "shoulder": 21,
+        "sleeve": 25,
         "unit": "in"
       },
       "stock_on_hand": 0
@@ -1164,6 +885,46 @@
       "created_at": "2026-08-20T17:45:00.000Z",
       "voided_at": null,
       "void_reason": null
+    },
+    {
+      "id": "ord-sold-hoodie",
+      "customer": {
+        "name": "Rohit Verma",
+        "mobile": "9820011223",
+        "email": "rohit@example.com"
+      },
+      "items": [
+        {
+          "product_id": "prod-sold-001",
+          "variant_id": "var-sold-001",
+          "quantity": 1,
+          "unit_price": 1699,
+          "name": "Acid-Washed Distressed Heavyweight Hoodie"
+        }
+      ],
+      "order_status": "DELIVERED",
+      "payment_status": "PAID",
+      "created_at": "2026-10-02T12:00:00.000Z"
+    },
+    {
+      "id": "ord-sold-shirt",
+      "customer": {
+        "name": "Aditya Sen",
+        "mobile": "9820044556",
+        "email": "aditya@example.com"
+      },
+      "items": [
+        {
+          "product_id": "prod-sold-002",
+          "variant_id": "var-sold-002",
+          "quantity": 1,
+          "unit_price": 1399,
+          "name": "Archival Faded Black Twill Workwear Overshirt"
+        }
+      ],
+      "order_status": "DELIVERED",
+      "payment_status": "PAID",
+      "created_at": "2026-10-04T15:30:00.000Z"
     }
   ],
   "holds": [
