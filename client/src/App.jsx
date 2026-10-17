@@ -14,6 +14,7 @@ import AboutView from './components/AboutView';
 import ContactView from './components/ContactView';
 import PolicyModal from './components/PolicyModal';
 import AdminPanel from './components/AdminPanel';
+import NikhilAdminDashboard from './components/NikhilAdminDashboard';
 import StayTunedSection from './components/StayTunedSection';
 import CurvedLoop from './components/CurvedLoop';
 import {
@@ -249,19 +250,22 @@ export default function App() {
     localStorage.setItem('curated_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // Handle URL routing for /checkout and Supabase Google OAuth callback
+  // Handle URL routing for /checkout, /nikhil, and Supabase Google OAuth callback
   useEffect(() => {
     const handleLocationChange = () => {
       const pathname = window.location.pathname.replace(/\/+$/, '');
       const hash = window.location.hash;
       const search = window.location.search;
 
-      // Automatically navigate to dedicated CheckoutPage if user lands on /checkout or returns from OAuth
-      if (pathname === '/checkout' || hash.includes('access_token') || search.includes('code=')) {
+      // Automatically navigate to dedicated admin dashboard if user lands on /nikhil
+      if (pathname === '/nikhil') {
+        setCurrentView('nikhil');
+        setCheckoutModalOpen(false);
+      } else if (pathname === '/checkout' || hash.includes('access_token') || search.includes('code=')) {
         setCurrentView('checkout');
         setCheckoutModalOpen(false);
       } else if (pathname === '' || pathname === '/') {
-        if (currentView === 'checkout') {
+        if (currentView === 'checkout' || currentView === 'nikhil') {
           setCurrentView('home');
           setCheckoutModalOpen(false);
         }
@@ -276,7 +280,10 @@ export default function App() {
       if (session?.user) {
         setAuthUser(session.user);
         const path = window.location.pathname.replace(/\/+$/, '');
-        if (path === '/checkout' || window.location.hash.includes('access_token')) {
+        if (path === '/nikhil') {
+          setCurrentView('nikhil');
+          setCheckoutModalOpen(false);
+        } else if (path === '/checkout' || window.location.hash.includes('access_token')) {
           setCurrentView('checkout');
           setCheckoutModalOpen(false);
         }
@@ -400,7 +407,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
       {/* Universal Navigation */}
-      {currentView !== 'admin' && (
+      {currentView !== 'admin' && currentView !== 'nikhil' && (
         <Navbar
           currentView={currentView}
           setCurrentView={setCurrentView}
@@ -415,6 +422,19 @@ export default function App() {
 
       {/* Main Content Areas */}
       <main style={{ flexGrow: 1 }}>
+        {/* ========================================================
+            VIEW: NIKHIL PROTECTED ADMIN DASHBOARD (/nikhil)
+        ======================================================== */}
+        {currentView === 'nikhil' && (
+          <NikhilAdminDashboard
+            onExit={() => {
+              setCurrentView('home');
+              window.history.pushState({}, '', '/');
+              fetchProductsAndSettings();
+            }}
+          />
+        )}
+
         {/* ========================================================
             VIEW: ADMIN CONTROL CENTER
         ======================================================== */}
@@ -1045,7 +1065,7 @@ export default function App() {
       )}
 
       {/* Global Footer */}
-      {currentView !== 'admin' && (
+      {currentView !== 'admin' && currentView !== 'nikhil' && (
         <Footer
           setCurrentView={setCurrentView}
           setCategoryFilter={setCategoryFilter}

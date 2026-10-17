@@ -27,6 +27,10 @@
       "dest": "/checkout/index.html"
     },
     {
+      "src": "/nikhil.*",
+      "dest": "/nikhil/index.html"
+    },
+    {
       "handle": "filesystem"
     },
     {

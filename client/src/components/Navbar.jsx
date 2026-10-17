@@ -147,29 +147,6 @@ export default function Navbar({
               <Search size={20} />
             </button>
 
-            {/* Quick Admin Toggle (Desktop) */}
-            <button
-              onClick={() => handleNavClick(isAdmin ? 'shop' : 'admin')}
-              className="desktop-only"
-              style={{
-                padding: '6px 12px',
-                fontSize: '11px',
-                fontFamily: 'var(--font-btn)',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                borderRadius: 'var(--radius-sm)',
-                background: isAdmin ? '#121212' : 'transparent',
-                color: isAdmin ? '#FFFFFF' : '#121212',
-                border: '1px solid #121212',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <ShieldCheck size={13} color={isAdmin ? '#FFFFFF' : '#121212'} />
-              <span>ADMIN</span>
-            </button>
 
             {/* Cart Trigger */}
             <button
@@ -248,34 +225,6 @@ export default function Navbar({
             </button>
           ))}
 
-          {/* Mobile Admin Portal Entry */}
-          <button
-            onClick={() => handleNavClick(isAdmin ? 'shop' : 'admin')}
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-sm)',
-              textAlign: 'left',
-              fontSize: '13px',
-              fontWeight: 700,
-              fontFamily: 'var(--font-btn)',
-              letterSpacing: '0.06em',
-              color: '#121212',
-              padding: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              marginTop: '12px',
-              width: '100%'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldCheck size={16} color="#121212" />
-              <span>ADMIN PORTAL</span>
-            </div>
-            <ArrowRight size={14} color="#121212" />
-          </button>
 
           <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
             <p style={{ fontSize: '11px', color: '#121212', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' }}>

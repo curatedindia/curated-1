@@ -17,10 +17,18 @@ if (fs.existsSync(indexPath)) {
   fs.copyFileSync(indexPath, path.join(checkoutDir, 'index.html'));
   fs.copyFileSync(indexPath, path.join(distDir, 'checkout.html'));
 
-  // 2. Create dist/404.html so Vercel automatically serves the SPA on any unhandled route
+  // 2. Create dist/nikhil/index.html so /nikhil is a physical static directory/file on Vercel
+  const nikhilDir = path.join(distDir, 'nikhil');
+  if (!fs.existsSync(nikhilDir)) {
+    fs.mkdirSync(nikhilDir, { recursive: true });
+  }
+  fs.copyFileSync(indexPath, path.join(nikhilDir, 'index.html'));
+  fs.copyFileSync(indexPath, path.join(distDir, 'nikhil.html'));
+
+  // 3. Create dist/404.html so Vercel automatically serves the SPA on any unhandled route
   fs.copyFileSync(indexPath, path.join(distDir, '404.html'));
 
-  console.log('✓ Postbuild complete: Generated /checkout/index.html, /checkout.html, and 404.html in client/dist');
+  console.log('✓ Postbuild complete: Generated /checkout, /nikhil, and 404.html fallbacks in client/dist');
 } else {
   console.warn('Warning: dist/index.html not found, skipping postbuild fallbacks');
 }
