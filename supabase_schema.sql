@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CURATED INDIA - SUPABASE SCHEMA & ROW LEVEL SECURITY (RLS) POLICIES
+-- CURATED INDIA - SUPABASE SCHEMA & SECURITY HARDENING
 -- Target Admin: hello.curatedindia@gmail.com
 -- ==============================================================================
 
@@ -79,7 +79,7 @@ USING (
 );
 
 -- ==============================================================================
--- 5. STORAGE BUCKET: product-images
+-- 5. STORAGE BUCKET: product-images (SECURITY ADVISOR HARDENING)
 -- ==============================================================================
 
 -- Create bucket 'product-images' if not already present
@@ -89,18 +89,34 @@ ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- Drop existing storage policies on product-images
 DROP POLICY IF EXISTS "Public Read Access for Product Images" ON storage.objects;
+DROP POLICY IF EXISTS "Public Can View Individual Images No Listing" ON storage.objects;
+DROP POLICY IF EXISTS "Admin Select Product Images" ON storage.objects;
 DROP POLICY IF EXISTS "Admin Upload Product Images" ON storage.objects;
 DROP POLICY IF EXISTS "Admin Update Product Images" ON storage.objects;
 DROP POLICY IF EXISTS "Admin Delete Product Images" ON storage.objects;
 
--- Storage Policy 1: Public SELECT (Read)
-CREATE POLICY "Public Read Access for Product Images"
+-- Fix Warning: 'Public Bucket Allows Listing on storage.product-images'
+-- Allows viewing individual images by URL but blocks directory/bucket listing (.list())
+CREATE POLICY "Public Can View Individual Images No Listing"
 ON storage.objects
 FOR SELECT
 TO public
-USING (bucket_id = 'product-images');
+USING (
+  bucket_id = 'product-images'
+  AND NOT storage.allow_only_operation('object.list')
+);
 
--- Storage Policy 2: Admin INSERT (Upload) strictly restricted to hello.curatedindia@gmail.com
+-- Allow Admin to list and inspect objects in product-images
+CREATE POLICY "Admin Select Product Images"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'product-images'
+  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- Storage Admin INSERT (Upload) strictly restricted to hello.curatedindia@gmail.com
 CREATE POLICY "Admin Upload Product Images"
 ON storage.objects
 FOR INSERT
@@ -110,7 +126,7 @@ WITH CHECK (
   AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Storage Policy 3: Admin UPDATE strictly restricted to hello.curatedindia@gmail.com
+-- Storage Admin UPDATE strictly restricted to hello.curatedindia@gmail.com
 CREATE POLICY "Admin Update Product Images"
 ON storage.objects
 FOR UPDATE
@@ -124,7 +140,7 @@ WITH CHECK (
   AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Storage Policy 4: Admin DELETE strictly restricted to hello.curatedindia@gmail.com
+-- Storage Admin DELETE strictly restricted to hello.curatedindia@gmail.com
 CREATE POLICY "Admin Delete Product Images"
 ON storage.objects
 FOR DELETE
@@ -133,3 +149,13 @@ USING (
   bucket_id = 'product-images'
   AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
+
+-- ==============================================================================
+-- 6. SECURITY DEFINER HARDENING: rls_auto_enable()
+-- Fix Warnings:
+-- 'Public Can Execute SECURITY DEFINER Function on public.rls_auto_enable()'
+-- 'Signed-In Users Can Execute SECURITY DEFINER Function on public.rls_auto_enable()'
+-- ==============================================================================
+REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM authenticated;
