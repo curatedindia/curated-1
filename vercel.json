@@ -23,6 +23,10 @@
       "dest": "/api/index.js"
     },
     {
+      "src": "/checkout.*",
+      "dest": "/checkout/index.html"
+    },
+    {
       "handle": "filesystem"
     },
     {
