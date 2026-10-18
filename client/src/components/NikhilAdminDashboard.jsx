@@ -28,7 +28,10 @@ import {
   Calendar,
   Search,
   Camera,
-  ChevronRight
+  ChevronRight,
+  Send,
+  Bell,
+  Loader2
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
@@ -180,6 +183,12 @@ export default function NikhilAdminDashboard({ onExit }) {
     marquee_headline: 'CURATED | SEARCHED • FILTERED • QUALITY CHECKED • HANDPICKED'
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Drop Alerts Broadcast State
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState(null); // { type: 'success' | 'error', text: string }
 
   // Activity Log State
   const [activityLogs, setActivityLogs] = useState([]);
@@ -687,6 +696,241 @@ export default function NikhilAdminDashboard({ onExit }) {
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 3000);
   };
+
+  // Drop Alerts Broadcast Submit Handler
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastSubject.trim()) {
+      setBroadcastStatus({ type: 'error', text: 'Please enter a subject line for the drop alert.' });
+      return;
+    }
+    if (!broadcastMessage.trim()) {
+      setBroadcastStatus({ type: 'error', text: 'Please enter the broadcast message body.' });
+      return;
+    }
+
+    setBroadcastSending(true);
+    setBroadcastStatus(null);
+
+    const adminEmail = currentUser?.email || REQUIRED_ADMIN_EMAIL;
+
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminEmail,
+          subject: broadcastSubject.trim(),
+          message: broadcastMessage.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBroadcastStatus({
+          type: 'success',
+          text: `Sent to ${data.count !== undefined ? data.count : 0} subscribers`
+        });
+        setBroadcastSubject('');
+        setBroadcastMessage('');
+      } else {
+        setBroadcastStatus({
+          type: 'error',
+          text: data.error || data.message || 'Failed to send broadcast alert.'
+        });
+      }
+    } catch (err) {
+      console.error('[Admin] Broadcast error:', err);
+      setBroadcastStatus({
+        type: 'error',
+        text: err.message || 'Network error while broadcasting drop alert.'
+      });
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
+  // Render Helper: Drop Alerts Broadcast Card
+  const renderDropAlertsBroadcastCard = () => (
+    <div style={{
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #E4E4E7',
+      borderRadius: '8px',
+      padding: '18px 16px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+      boxSizing: 'border-box',
+      width: '100%'
+    }}>
+      {/* Header */}
+      <div style={{ borderBottom: '1px solid #E4E4E7', paddingBottom: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bell size={20} color="#121212" />
+            <h2 style={{
+              fontSize: '16px',
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              margin: 0,
+              color: '#121212'
+            }}>
+              DROP ALERTS BROADCAST
+            </h2>
+          </div>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            padding: '2px 8px',
+            backgroundColor: '#121212',
+            color: '#FFFFFF',
+            borderRadius: '4px'
+          }}>
+            EMAIL
+          </span>
+        </div>
+        <p style={{ fontSize: '12px', color: '#71717A', marginTop: '4px', marginBottom: 0 }}>
+          Notify all drop-list subscribers instantly via BCC private broadcast.
+        </p>
+      </div>
+
+      {/* Status Messages */}
+      {broadcastStatus?.type === 'success' && (
+        <div style={{
+          padding: '12px 14px',
+          backgroundColor: '#F0FDF4',
+          border: '1px solid #86EFAC',
+          borderRadius: '6px',
+          color: '#15803D',
+          fontSize: '13px',
+          fontWeight: 700,
+          marginBottom: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+          <span>{broadcastStatus.text}</span>
+        </div>
+      )}
+
+      {broadcastStatus?.type === 'error' && (
+        <div style={{
+          padding: '12px 14px',
+          backgroundColor: '#FEF2F2',
+          border: '1px solid #FCA5A5',
+          borderRadius: '6px',
+          color: '#B91C1C',
+          fontSize: '13px',
+          fontWeight: 600,
+          marginBottom: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span>{broadcastStatus.text}</span>
+        </div>
+      )}
+
+      {/* Broadcast Form */}
+      <form onSubmit={handleSendBroadcast} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+            DROP ALERT SUBJECT *
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. DROP 04: ARCHIVAL TEES & HOODIES LIVE NOW"
+            value={broadcastSubject}
+            onChange={(e) => setBroadcastSubject(e.target.value)}
+            disabled={broadcastSending}
+            required
+            style={{
+              width: '100%',
+              minHeight: '44px',
+              padding: '10px 14px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #D4D4D8',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#121212',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+            MESSAGE CONTENT *
+          </label>
+          <textarea
+            rows={5}
+            placeholder="Enter announcement details for subscribers (e.g., release notes, 1-of-1 pieces available, direct link to shop)..."
+            value={broadcastMessage}
+            onChange={(e) => setBroadcastMessage(e.target.value)}
+            disabled={broadcastSending}
+            required
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #D4D4D8',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: 500,
+              color: '#121212',
+              boxSizing: 'border-box',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              lineHeight: 1.5
+            }}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={broadcastSending}
+          style={{
+            width: '100%',
+            minHeight: '48px',
+            backgroundColor: broadcastSending ? '#71717A' : '#121212',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: 800,
+            letterSpacing: '0.04em',
+            cursor: broadcastSending ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginTop: '4px',
+            transition: 'background-color 0.15s ease'
+          }}
+        >
+          {broadcastSending ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Sending...</span>
+            </>
+          ) : (
+            <>
+              <Send size={15} />
+              <span>SEND DROP ALERT</span>
+            </>
+          )}
+        </button>
+
+        <div style={{ fontSize: '11px', color: '#71717A', textAlign: 'center', marginTop: '2px' }}>
+          Broadcasts to all newsletter subscribers with hidden BCC headers
+        </div>
+      </form>
+    </div>
+  );
 
   // ========================================================
   // RENDER: LOADING CHECK
@@ -1198,6 +1442,9 @@ export default function NikhilAdminDashboard({ onExit }) {
               <PlusCircle size={18} />
               <span>SNAP &amp; PUBLISH NEW PIECE</span>
             </button>
+
+            {/* Drop Alerts Broadcast Card */}
+            {renderDropAlertsBroadcastCard()}
 
           </div>
         )}
@@ -1969,16 +2216,22 @@ export default function NikhilAdminDashboard({ onExit }) {
         )}
 
         {/* ========================================================
-            TAB 4: SETTINGS (MOBILE STORE CONFIGURATION)
+            TAB 4: SETTINGS (MOBILE STORE CONFIGURATION & DROP ALERTS)
         ======================================================== */}
         {activeTab === 'settings' && (
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E4E4E7',
-            borderRadius: '8px',
-            padding: '18px 16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* Drop Alerts Broadcast Card */}
+            {renderDropAlertsBroadcastCard()}
+
+            {/* Store Configuration Card */}
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E4E4E7',
+              borderRadius: '8px',
+              padding: '18px 16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}>
             <div style={{ borderBottom: '1px solid #E4E4E7', paddingBottom: '12px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Settings size={20} color="#121212" />
@@ -2139,7 +2392,8 @@ export default function NikhilAdminDashboard({ onExit }) {
               </button>
             </form>
           </div>
-        )}
+        </div>
+      )}
 
       </main>
 

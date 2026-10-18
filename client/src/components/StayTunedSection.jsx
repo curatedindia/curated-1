@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Check, ArrowRight, Bell } from 'lucide-react';
+import supabase from '../supabaseClient';
 
 export default function StayTunedSection() {
   const [email, setEmail] = useState('');
@@ -9,26 +10,36 @@ export default function StayTunedSection() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) return;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) return;
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/newsletter/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSubscribed(true);
-        setMessage(data.message || "You're on the list! We'll notify you the moment a new batch drops.");
-        setEmail('');
+      // Insert into Supabase newsletter_subscribers table
+      const { data, error } = await supabase
+        .from('newsletter_subscribers')
+        .insert([{ email: cleanEmail }]);
+
+      if (error) {
+        // If unique constraint violation (code 23505), show success anyway to prevent data leaking
+        if (error.code === '23505') {
+          setSubscribed(true);
+          setMessage('Added to the drop list.');
+          setEmail('');
+        } else {
+          console.error('[Newsletter] Subscription error:', error);
+          setMessage(error.message || 'Unable to join drop alerts. Please try again.');
+        }
       } else {
-        setMessage(data.message || 'Unable to join drop alerts. Please try again.');
+        setSubscribed(true);
+        setMessage('Added to the drop list.');
+        setEmail('');
       }
     } catch (err) {
+      console.error('[Newsletter] Unexpected subscription error:', err);
+      // Fail safely with friendly success state
       setSubscribed(true);
-      setMessage("You're on the list! We'll notify you the moment a new batch drops.");
+      setMessage('Added to the drop list.');
       setEmail('');
     } finally {
       setSubmitting(false);

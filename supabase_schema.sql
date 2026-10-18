@@ -253,3 +253,31 @@ TO authenticated
 WITH CHECK (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
+
+-- ==============================================================================
+-- 9. NEWSLETTER SUBSCRIBERS TABLE (DROP NOTIFICATIONS)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Can Subscribe to Newsletter" ON public.newsletter_subscribers;
+DROP POLICY IF EXISTS "Admin Read Newsletter Subscribers" ON public.newsletter_subscribers;
+
+CREATE POLICY "Public Can Subscribe to Newsletter"
+ON public.newsletter_subscribers
+FOR INSERT
+TO public
+WITH CHECK (true);
+
+CREATE POLICY "Admin Read Newsletter Subscribers"
+ON public.newsletter_subscribers
+FOR SELECT
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
