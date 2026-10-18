@@ -1,52 +1,75 @@
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
-module.exports = async function handler(req, res) {
-  // CORS configuration
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed. Use POST.' });
-  }
-
-  try {
-    let body = req.body;
-    if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        // keep as is
-      }
+function sendJson(res, statusCode, data) {
+  res.setHeader('Content-Type', 'application/json');
+  if (typeof res.status === 'function') {
+    res.status(statusCode);
+    if (typeof res.json === 'function') {
+      return res.json(data);
     }
+  }
+  res.statusCode = statusCode;
+  return res.end(JSON.stringify(data));
+}
+
+async function getRequestBody(req) {
+  if (req.body) {
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch (e) { return {}; }
+    }
+    return req.body;
+  }
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', (chunk) => { raw += chunk; });
+    req.on('end', () => {
+      try { resolve(raw ? JSON.parse(raw) : {}); } catch (e) { resolve({}); }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    // CORS configuration
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 200;
+      return res.end();
+    }
+
+    if (req.method !== 'POST') {
+      return sendJson(res, 405, { success: false, error: 'Method not allowed. Use POST.' });
+    }
+
+    const body = await getRequestBody(req);
     const { adminEmail, subject, message } = body || {};
 
     // 1. Verify admin authorization
     if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {
-      return res.status(403).json({
+      return sendJson(res, 403, {
         success: false,
         error: 'Unauthorized: Only hello.curatedindia@gmail.com can broadcast drop alerts.'
       });
     }
 
     if (!subject || !subject.trim()) {
-      return res.status(400).json({
+      return sendJson(res, 400, {
         success: false,
         error: 'Subject line is required.'
       });
     }
 
     if (!message || !message.trim()) {
-      return res.status(400).json({
+      return sendJson(res, 400, {
         success: false,
         error: 'Message content is required.'
       });
@@ -57,7 +80,7 @@ module.exports = async function handler(req, res) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!serviceRoleKey) {
-      return res.status(500).json({
+      return sendJson(res, 500, {
         success: false,
         error: 'SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel Environment Variables.'
       });
@@ -70,14 +93,14 @@ module.exports = async function handler(req, res) {
 
     if (fetchError) {
       console.error('[Broadcast] Error querying newsletter_subscribers:', fetchError);
-      return res.status(500).json({
+      return sendJson(res, 500, {
         success: false,
         error: `Failed to fetch subscriber list: ${fetchError.message}`
       });
     }
 
     if (!subscribers || subscribers.length === 0) {
-      return res.status(200).json({
+      return sendJson(res, 200, {
         success: true,
         count: 0,
         message: 'No subscribers found on the drop list.'
@@ -89,7 +112,7 @@ module.exports = async function handler(req, res) {
       .filter((em) => em && em.includes('@'));
 
     if (recipientEmails.length === 0) {
-      return res.status(200).json({
+      return sendJson(res, 200, {
         success: true,
         count: 0,
         message: 'No valid subscriber email addresses found.'
@@ -99,7 +122,7 @@ module.exports = async function handler(req, res) {
     // 3. Configure Nodemailer with hello.curatedindia@gmail.com and EMAIL_APP_PASSWORD
     const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
     if (!emailAppPassword) {
-      return res.status(500).json({
+      return sendJson(res, 500, {
         success: false,
         error: 'EMAIL_APP_PASSWORD is not configured in Vercel Environment Variables.'
       });
@@ -139,7 +162,7 @@ module.exports = async function handler(req, res) {
 
     console.log(`[Broadcast] Successfully sent drop alert "${subject}" to ${recipientEmails.length} subscribers.`);
 
-    return res.status(200).json({
+    return sendJson(res, 200, {
       success: true,
       count: recipientEmails.length,
       message: `Sent to ${recipientEmails.length} subscribers`
@@ -147,7 +170,7 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     console.error('[Broadcast] Internal error during broadcast:', err);
-    return res.status(500).json({
+    return sendJson(res, 500, {
       success: false,
       error: err.message || 'Failed to send broadcast alert.'
     });
