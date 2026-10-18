@@ -159,3 +159,97 @@ USING (
 REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM authenticated;
+
+-- ==============================================================================
+-- 7. ORDERS TABLE & ROW LEVEL SECURITY (RLS)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_number TEXT,
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  payment_status TEXT DEFAULT 'PAID',
+  items JSONB DEFAULT '[]'::jsonb,
+  shipping_address JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on orders table
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing orders policies to prevent conflicts
+DROP POLICY IF EXISTS "Public Read Access on Orders" ON public.orders;
+DROP POLICY IF EXISTS "Public Insert Orders" ON public.orders;
+DROP POLICY IF EXISTS "Admin Update Orders" ON public.orders;
+DROP POLICY IF EXISTS "Admin Delete Orders" ON public.orders;
+
+-- Public Insert: Customers can create orders upon checkout
+CREATE POLICY "Public Insert Orders"
+ON public.orders
+FOR INSERT
+TO public
+WITH CHECK (true);
+
+-- Public Read: View orders for tracking and admin dashboard
+CREATE POLICY "Public Read Access on Orders"
+ON public.orders
+FOR SELECT
+TO public
+USING (true);
+
+-- Admin Update: Strictly restricted so ONLY hello.curatedindia@gmail.com can update status (e.g. PACKED)
+CREATE POLICY "Admin Update Orders"
+ON public.orders
+FOR UPDATE
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+)
+WITH CHECK (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- Admin Delete: Strictly restricted to hello.curatedindia@gmail.com
+CREATE POLICY "Admin Delete Orders"
+ON public.orders
+FOR DELETE
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- ==============================================================================
+-- 8. INVENTORY TRANSACTIONS TABLE (ACTIVITY LOG LEDGER)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.inventory_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sku TEXT,
+  product_name TEXT,
+  quantity_change INTEGER DEFAULT 0,
+  reason TEXT NOT NULL,
+  admin_user TEXT DEFAULT 'hello.curatedindia@gmail.com',
+  order_id TEXT,
+  note TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Access on Inventory Transactions" ON public.inventory_transactions;
+DROP POLICY IF EXISTS "Admin Insert Inventory Transactions" ON public.inventory_transactions;
+
+CREATE POLICY "Public Read Access on Inventory Transactions"
+ON public.inventory_transactions
+FOR SELECT
+TO public
+USING (true);
+
+CREATE POLICY "Admin Insert Inventory Transactions"
+ON public.inventory_transactions
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
