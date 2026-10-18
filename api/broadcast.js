@@ -1,9 +1,8 @@
-// api/broadcast.js - Dedicated Vercel Serverless Function
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async function handler(req, res) {
-  // Set CORS headers
+  // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -21,7 +20,15 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { adminEmail, subject, message } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        // keep as is
+      }
+    }
+    const { adminEmail, subject, message } = body || {};
 
     // 1. Verify admin authorization
     if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {

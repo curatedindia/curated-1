@@ -1420,7 +1420,7 @@ app.post('/api/test/parallel-purchase', async (req, res) => {
 // EMAIL BROADCAST ROUTE (/api/broadcast)
 // Authorized exclusively for hello.curatedindia@gmail.com
 // ========================================================
-app.post('/api/broadcast', async (req, res) => {
+app.post(['/api/broadcast', '/broadcast'], async (req, res) => {
   try {
     const { adminEmail, subject, message } = req.body || {};
 
@@ -1551,7 +1551,7 @@ app.post('/api/broadcast', async (req, res) => {
 // ========================================================
 // PUBLIC NEWSLETTER SUBSCRIBE ENDPOINT (/api/newsletter/subscribe)
 // ========================================================
-app.post('/api/newsletter/subscribe', async (req, res) => {
+app.post(['/api/newsletter/subscribe', '/newsletter/subscribe'], async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email || !email.includes('@')) {
