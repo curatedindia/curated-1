@@ -465,7 +465,17 @@ export default function CheckoutModal({
                   type="checkbox"
                   checked={policyAck}
                   onChange={(e) => setPolicyAck(e.target.checked)}
-                  style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#121212', flexShrink: 0 }}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    minHeight: '18px',
+                    maxHeight: '18px',
+                    padding: 0,
+                    marginTop: '2px',
+                    accentColor: '#121212',
+                    flexShrink: 0,
+                    cursor: 'pointer'
+                  }}
                 />
                 <span style={{ fontSize: '12px', lineHeight: 1.5, color: 'var(--text-primary)' }}>
                   I understand that CURATED follows a <strong>No Return Policy</strong> and have reviewed the product details, size and condition before placing my order.{' '}

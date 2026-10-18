@@ -520,7 +520,17 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
                       type="checkbox"
                       checked={policyAck}
                       onChange={(e) => setPolicyAck(e.target.checked)}
-                      style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#121212', flexShrink: 0 }}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        minHeight: '18px',
+                        maxHeight: '18px',
+                        padding: 0,
+                        marginTop: '2px',
+                        accentColor: '#121212',
+                        flexShrink: 0,
+                        cursor: 'pointer'
+                      }}
                     />
                     <span style={{ fontSize: '12px', lineHeight: 1.5, color: '#121212' }}>
                       I understand that CURATED pieces are <strong>1-of-1 archival garments</strong> with a strict <strong>No Return / No Refund Policy</strong>.

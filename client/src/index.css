@@ -280,7 +280,7 @@ button, .btn {
 }
 
 /* Form inputs */
-input, select, textarea {
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
   width: 100%;
   background: #FFFFFF;
   border: 1px solid var(--border-subtle);
@@ -293,12 +293,28 @@ input, select, textarea {
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-input:focus, select:focus, textarea:focus {
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
   border-color: var(--text-primary);
   box-shadow: 0 0 0 1px var(--text-primary);
 }
-input::placeholder, textarea::placeholder {
+input:not([type="checkbox"]):not([type="radio"])::placeholder, textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* Checkboxes and Radios */
+input[type="checkbox"], input[type="radio"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  max-height: 18px !important;
+  padding: 0 !important;
+  margin: 0;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  accent-color: #121212;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 /* Glassmorphism containers */
