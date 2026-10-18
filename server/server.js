@@ -15,6 +15,14 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// URL prefix normalizer for Vercel Serverless Functions
+app.use((req, res, next) => {
+  if (req.url && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 // Static uploads directory
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -33,10 +41,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Periodic cleanup of expired holds every 5 seconds
-setInterval(() => {
+// Periodic cleanup of expired holds every 5 seconds (unref'd for serverless safety)
+const holdCleanupTimer = setInterval(() => {
   db.cleanExpiredHolds();
 }, 5000);
+if (holdCleanupTimer && holdCleanupTimer.unref) {
+  holdCleanupTimer.unref();
+}
 
 // Helper: generate next SKU
 function generateSKU(categoryId) {
@@ -1565,16 +1576,17 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
   }
 });
 
-// Serve frontend build if in production
+// Serve frontend build if in standalone production (not on Vercel)
 const CLIENT_DIST = path.join(__dirname, '..', 'client', 'dist');
-if (fs.existsSync(CLIENT_DIST)) {
+if (!process.env.VERCEL && fs.existsSync(CLIENT_DIST)) {
   app.use(express.static(CLIENT_DIST));
   app.get('*', (req, res) => {
     res.sendFile(path.join(CLIENT_DIST, 'index.html'));
   });
 }
 
-if (require.main === module) {
+// Only call app.listen() when executed directly; Vercel executes server.js as a Serverless Function
+if (require.main === module && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(` CURATED Server running at: http://localhost:${PORT}`);
@@ -1584,4 +1596,5 @@ if (require.main === module) {
   });
 }
 
+// Export Express app for Vercel Serverless Functions
 module.exports = app;

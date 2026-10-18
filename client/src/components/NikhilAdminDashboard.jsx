@@ -725,7 +725,15 @@ export default function NikhilAdminDashboard({ onExit }) {
         })
       });
 
-      const data = await res.json();
+      let data = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(res.ok ? text : `Server returned status ${res.status}. Please ensure backend route is reachable.`);
+      }
+
       if (res.ok && data.success) {
         setBroadcastStatus({
           type: 'success',
