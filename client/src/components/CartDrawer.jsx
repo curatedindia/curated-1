@@ -298,27 +298,6 @@ export default function CartDrawer({
                 </>
               )}
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onProceedToCheckout();
-              }}
-              style={{
-                width: '100%',
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-muted)',
-                fontSize: '11px',
-                marginTop: '10px',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                letterSpacing: '0.04em'
-              }}
-            >
-              or continue as guest without Google
-            </button>
           </div>
         )}
       </div>
