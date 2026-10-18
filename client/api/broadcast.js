@@ -1,5 +1,5 @@
-const nodemailer = require('nodemailer');
-const { createClient } = require('@supabase/supabase-js');
+import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
 
 function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json');
@@ -30,7 +30,7 @@ async function getRequestBody(req) {
   });
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     // CORS configuration
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -175,4 +175,4 @@ module.exports = async function handler(req, res) {
       error: err.message || 'Failed to send broadcast alert.'
     });
   }
-};
+}
