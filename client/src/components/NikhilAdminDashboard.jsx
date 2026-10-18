@@ -517,6 +517,19 @@ export default function NikhilAdminDashboard({ onExit }) {
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        e.target.value = '';
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setImageFile(null);
+        setImagePreview('');
+        const errorMsg = 'File exceeds the 50MB limit. Please select a smaller image.';
+        setActionError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+      setActionError('');
       setImageFile(file);
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
@@ -1807,7 +1820,6 @@ export default function NikhilAdminDashboard({ onExit }) {
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={handleImageChange}
                     style={{ display: 'none' }}
                   />

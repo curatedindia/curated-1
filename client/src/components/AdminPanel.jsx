@@ -143,6 +143,14 @@ export default function AdminPanel({ onExitAdmin }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 50 * 1024 * 1024) {
+      e.target.value = '';
+      const errMsg = 'File exceeds the 50MB limit. Please select a smaller image.';
+      showStatus(errMsg);
+      alert(errMsg);
+      return;
+    }
+
     const fd = new FormData();
     fd.append('image', file);
 
@@ -737,7 +745,7 @@ export default function AdminPanel({ onExitAdmin }) {
                   <label className="btn btn-secondary" style={{ cursor: 'pointer', height: '44px' }}>
                     <Camera size={18} color="var(--sage-light)" />
                     <span>Take Photo / Select File</span>
-                    <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                   </label>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     {productForm.images?.length} image(s) loaded
