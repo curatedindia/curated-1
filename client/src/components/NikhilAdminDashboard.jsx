@@ -951,13 +951,19 @@ export default function NikhilAdminDashboard({ onExit }) {
       </header>
 
       {/* 2. Main Mobile Content Container */}
-      <main style={{
-        width: '100%',
-        maxWidth: '100%',
-        padding: '16px 14px calc(90px + env(safe-area-inset-bottom, 20px))',
-        boxSizing: 'border-box',
-        overflowX: 'hidden'
-      }}>
+      <main
+        className="pb-24"
+        style={{
+          width: '100%',
+          maxWidth: '100%',
+          paddingTop: '16px',
+          paddingLeft: '14px',
+          paddingRight: '14px',
+          paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 24px))',
+          boxSizing: 'border-box',
+          overflowX: 'hidden'
+        }}
+      >
         
         {/* Status Messages */}
         {actionError && (
@@ -2135,170 +2141,36 @@ export default function NikhilAdminDashboard({ onExit }) {
           </div>
         )}
 
-        {/* ========================================================
-            TAB 5: ACTIVITY LOG (MOBILE CARDS)
-        ======================================================== */}
-        {activeTab === 'activity' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h1 style={{
-                  fontSize: '18px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
-                  ACTIVITY LOG
-                </h1>
-                <p style={{ fontSize: '12px', color: '#71717A', margin: '2px 0 0 0' }}>
-                  Inventory transactions history
-                </p>
-              </div>
-
-              <button
-                onClick={fetchActivityLogs}
-                disabled={loadingLogs}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D4D4D8',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <RefreshCw size={12} className={loadingLogs ? 'animate-spin' : ''} />
-                <span>REFRESH</span>
-              </button>
-            </div>
-
-            {/* Filter pills */}
-            <div style={{ display: 'flex', gap: '6px', width: '100%', overflowX: 'auto', paddingBottom: '2px' }}>
-              {['ALL', 'SALE', 'STOCK', 'DELETE'].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setLogFilter(f)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid',
-                    borderColor: logFilter === f ? '#121212' : '#D4D4D8',
-                    backgroundColor: logFilter === f ? '#121212' : '#FFFFFF',
-                    color: logFilter === f ? '#FFFFFF' : '#52525B',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {f === 'ALL' ? 'ALL EVENTS' : f}
-                </button>
-              ))}
-            </div>
-
-            {/* Log cards list */}
-            {loadingLogs ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#71717A', fontSize: '13px' }}>
-                Loading activity history...
-              </div>
-            ) : filteredActivityLogs.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#71717A', fontSize: '13px', backgroundColor: '#FFFFFF', borderRadius: '8px' }}>
-                No events recorded.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {filteredActivityLogs.map((log) => {
-                  const dateStr = log.created_at ? new Date(log.created_at).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }) : 'N/A';
-
-                  const isSale = (log.reason || '').toLowerCase().includes('sale');
-                  const isAdd = (log.reason || '').toLowerCase().includes('stock') || (log.reason || '').toLowerCase().includes('added');
-                  const isDelete = (log.reason || '').toLowerCase().includes('delete') || (log.reason || '').toLowerCase().includes('remove');
-
-                  let badgeBg = '#F4F4F5';
-                  let badgeColor = '#52525B';
-                  if (isSale) { badgeBg = '#DCFCE7'; badgeColor = '#15803D'; }
-                  else if (isAdd) { badgeBg = '#DBEAFE'; badgeColor = '#1D4ED8'; }
-                  else if (isDelete) { badgeBg = '#FEE2E2'; badgeColor = '#DC2626'; }
-
-                  return (
-                    <div
-                      key={log.id}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E4E4E7',
-                        borderRadius: '6px',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          backgroundColor: badgeBg,
-                          color: badgeColor
-                        }}>
-                          {log.reason || 'EVENT'}
-                        </span>
-                        <span style={{ fontSize: '11px', color: '#71717A' }}>{dateStr}</span>
-                      </div>
-
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#121212' }}>
-                        {log.product_name || log.sku || 'Piece Inventory Action'}
-                      </div>
-
-                      <div style={{ fontSize: '12px', color: '#71717A' }}>
-                        {log.note || 'No details'} • {log.admin_user || 'SYSTEM'}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
       </main>
 
-      {/* 3. Fixed Bottom Mobile Navigation Bar with Safe Area Insets */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 999,
-        backgroundColor: '#121212',
-        borderTop: '1px solid #27272A',
-        height: 'calc(62px + env(safe-area-inset-bottom, 0px))',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        width: '100%',
-        maxWidth: '100vw',
-        boxSizing: 'border-box'
-      }}>
-        
+      {/* 3. Mobile Fixed Bottom Tab Bar */}
+      <nav
+        className="fixed bottom-0 w-full z-50 bg-[#0B0B0C]"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          maxWidth: '100vw',
+          zIndex: 50,
+          backgroundColor: '#0B0B0C',
+          borderTop: '1px solid #1E1E22',
+          height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          boxSizing: 'border-box'
+        }}
+      >
         {/* Nav Item: Dashboard */}
         <button
           onClick={() => setActiveTab('dashboard')}
+          aria-label="Dashboard"
           style={{
             minHeight: '44px',
+            height: '100%',
             backgroundColor: 'transparent',
             border: 'none',
             color: activeTab === 'dashboard' ? '#FFFFFF' : '#71717A',
@@ -2306,22 +2178,26 @@ export default function NikhilAdminDashboard({ onExit }) {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '3px',
+            gap: '4px',
             cursor: 'pointer',
-            flex: 1
+            flex: 1,
+            padding: '6px 0',
+            transition: 'color 0.15s ease'
           }}
         >
           <LayoutDashboard size={20} color={activeTab === 'dashboard' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em' }}>
-            OVERVIEW
+          <span style={{ fontSize: '11px', fontWeight: activeTab === 'dashboard' ? 800 : 600, letterSpacing: '0.04em' }}>
+            Dashboard
           </span>
         </button>
 
         {/* Nav Item: Orders */}
         <button
           onClick={() => setActiveTab('orders')}
+          aria-label="Orders"
           style={{
             minHeight: '44px',
+            height: '100%',
             backgroundColor: 'transparent',
             border: 'none',
             color: activeTab === 'orders' ? '#FFFFFF' : '#71717A',
@@ -2329,13 +2205,15 @@ export default function NikhilAdminDashboard({ onExit }) {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '3px',
+            gap: '4px',
             cursor: 'pointer',
             position: 'relative',
-            flex: 1
+            flex: 1,
+            padding: '6px 0',
+            transition: 'color 0.15s ease'
           }}
         >
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
             <ShoppingBag size={20} color={activeTab === 'orders' ? '#FFFFFF' : '#71717A'} />
             {pendingOrdersCount > 0 && (
               <span style={{
@@ -2357,16 +2235,18 @@ export default function NikhilAdminDashboard({ onExit }) {
               </span>
             )}
           </div>
-          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em' }}>
-            ORDERS
+          <span style={{ fontSize: '11px', fontWeight: activeTab === 'orders' ? 800 : 600, letterSpacing: '0.04em' }}>
+            Orders
           </span>
         </button>
 
-        {/* Nav Item: Catalog / Add */}
+        {/* Nav Item: Catalog */}
         <button
           onClick={() => setActiveTab('catalog')}
+          aria-label="Catalog"
           style={{
             minHeight: '44px',
+            height: '100%',
             backgroundColor: 'transparent',
             border: 'none',
             color: activeTab === 'catalog' ? '#FFFFFF' : '#71717A',
@@ -2374,22 +2254,26 @@ export default function NikhilAdminDashboard({ onExit }) {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '3px',
+            gap: '4px',
             cursor: 'pointer',
-            flex: 1
+            flex: 1,
+            padding: '6px 0',
+            transition: 'color 0.15s ease'
           }}
         >
-          <PlusCircle size={22} color={activeTab === 'catalog' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em' }}>
-            CATALOG
+          <Package size={20} color={activeTab === 'catalog' ? '#FFFFFF' : '#71717A'} />
+          <span style={{ fontSize: '11px', fontWeight: activeTab === 'catalog' ? 800 : 600, letterSpacing: '0.04em' }}>
+            Catalog
           </span>
         </button>
 
         {/* Nav Item: Settings */}
         <button
           onClick={() => setActiveTab('settings')}
+          aria-label="Settings"
           style={{
             minHeight: '44px',
+            height: '100%',
             backgroundColor: 'transparent',
             border: 'none',
             color: activeTab === 'settings' ? '#FFFFFF' : '#71717A',
@@ -2397,40 +2281,18 @@ export default function NikhilAdminDashboard({ onExit }) {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '3px',
+            gap: '4px',
             cursor: 'pointer',
-            flex: 1
+            flex: 1,
+            padding: '6px 0',
+            transition: 'color 0.15s ease'
           }}
         >
           <Settings size={20} color={activeTab === 'settings' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em' }}>
-            SETTINGS
+          <span style={{ fontSize: '11px', fontWeight: activeTab === 'settings' ? 800 : 600, letterSpacing: '0.04em' }}>
+            Settings
           </span>
         </button>
-
-        {/* Nav Item: Activity */}
-        <button
-          onClick={() => setActiveTab('activity')}
-          style={{
-            minHeight: '44px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: activeTab === 'activity' ? '#FFFFFF' : '#71717A',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            cursor: 'pointer',
-            flex: 1
-          }}
-        >
-          <History size={20} color={activeTab === 'activity' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em' }}>
-            LOGS
-          </span>
-        </button>
-
       </nav>
 
     </div>
