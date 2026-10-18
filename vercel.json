@@ -3,14 +3,14 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server/server.js"
+      "destination": "/api/$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "/server/server.js"
+      "destination": "/api/index.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|uploads/).*)",
       "destination": "/index.html"
     }
   ]
