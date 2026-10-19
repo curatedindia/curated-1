@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json');
@@ -12,7 +12,7 @@ function sendJson(res, statusCode, data) {
   return res.end(JSON.stringify(data));
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -56,4 +56,4 @@ module.exports = async function handler(req, res) {
   }
 
   return sendJson(res, 200, { status: 'PENDING' });
-};
+}

@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json');
@@ -29,7 +29,7 @@ async function getRequestBody(req) {
   });
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -142,4 +142,4 @@ module.exports = async function handler(req, res) {
       message: err.message || 'Internal server error initiating checkout.'
     });
   }
-};
+}

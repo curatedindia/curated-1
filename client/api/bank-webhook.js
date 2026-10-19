@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json');
@@ -31,7 +31,7 @@ async function getRequestBody(req) {
 
 const SHARED_SECRET_KEY = process.env.ADMIN_PHONE_SECRET_KEY || 'ADMIN_PHONE_SECRET_KEY_123';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -84,4 +84,4 @@ module.exports = async function handler(req, res) {
     console.error('[Bank Webhook Error]:', err);
     return sendJson(res, 500, { error: err.message });
   }
-};
+}
