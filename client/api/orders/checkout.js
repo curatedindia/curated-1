@@ -106,29 +106,6 @@ export default async function handler(req, res) {
       void_reason: null
     };
 
-    // Optionally sync into Supabase
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq';
-
-    if (supabaseUrl && supabaseKey) {
-      try {
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        await supabase.from('orders').insert([{
-          order_number: order.order_number,
-          customer_name: order.customer?.name || 'Customer',
-          customer_email: order.customer?.email || 'customer@example.com',
-          total_amount: order.total,
-          status: 'PENDING',
-          payment_status: 'PENDING',
-          items: order.items,
-          shipping_address: order.customer,
-          created_at: order.created_at
-        }]);
-      } catch (dbErr) {
-        console.warn('[Checkout Serverless Supabase Sync Warning]:', dbErr.message);
-      }
-    }
-
     return sendJson(res, 200, {
       success: true,
       order,

@@ -124,8 +124,8 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Step 1: Initiate Atomic Hold Reservation
-  const handleProceedToPayment = async (e) => {
+  // Step 1: Proceed to Payment Gateway (Keep in client state/localStorage without saving to DB)
+  const handleProceedToPayment = (e) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -139,52 +139,25 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
       return;
     }
 
-    setSubmitting(true);
-    let orderData = null;
-    let expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
+    // Keep customer shipping details in client state and localStorage until payment is verified
     try {
-      const res = await fetch('/api/orders/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer: formData,
-          items: cartItems,
-          no_return_ack: policyAck
-        })
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await res.json();
-        if (res.ok && data.success && data.order) {
-          orderData = data.order;
-          if (data.expires_at) expiresAt = data.expires_at;
-        } else if (data.message && data.message.includes('sold out')) {
-          setErrorMessage(data.message);
-          setSubmitting(false);
-          return;
-        }
-      }
-    } catch (apiErr) {
-      console.warn('Backend checkout API warning, continuing to dynamic UPI payment:', apiErr);
+      localStorage.setItem('checkout_shipping', JSON.stringify(formData));
+    } catch (err) {
+      console.warn('Unable to persist shipping details in localStorage:', err);
     }
 
-    // Always ensure customer has an order reference to scan and pay via UPI
-    if (!orderData) {
-      const orderNumber = `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
-      const orderId = `ord-${Date.now()}`;
-      orderData = {
-        id: orderId,
-        order_number: orderNumber,
-        customer: formData,
-        items: cartItems,
-        total: total,
-        payment_status: 'PENDING',
-        order_status: 'PENDING_PAYMENT',
-        created_at: new Date().toISOString()
-      };
-    }
+    const orderNumber = `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderId = `ord-${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    const orderData = {
+      id: orderId,
+      order_number: orderNumber,
+      customer: formData,
+      items: cartItems,
+      total: total,
+      created_at: new Date().toISOString()
+    };
 
     setCurrentOrder(orderData);
     setHoldExpiresAt(expiresAt);
@@ -250,61 +223,98 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
 
     setIsVerifyingUtr(true);
     setPaymentStatusMsg({
-      text: 'Checking bank logs...',
+      text: 'Checking payment status...',
       type: 'info'
     });
 
-    const orderRef = currentOrder?.order_number || currentOrder?.id || `ORD-${Date.now()}`;
+    const orderRef = currentOrder?.order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 1. Submit UTR to Express server
-    if (currentOrder?.id) {
-      try {
-        await fetch(`/api/orders/${currentOrder.id}/confirm-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gateway_payment_id: cleanUtr,
-            payment_mode: 'UPI',
-            utr: cleanUtr
-          })
-        });
-      } catch (err) {
-        console.warn('Backend payment confirmation notice:', err);
+    // Retrieve shipping details from state or localStorage
+    let shippingDetails = formData;
+    try {
+      const savedShipping = localStorage.getItem('checkout_shipping');
+      if (savedShipping) {
+        shippingDetails = { ...formData, ...JSON.parse(savedShipping) };
       }
+    } catch (e) {
+      // fallback to state
     }
 
-    // 2. Insert order directly into Supabase orders table for immediate Admin Dashboard visibility
-    try {
-      await supabase.from('orders').insert([{
+    // Function to create order in database ONLY after verification succeeds
+    const createVerifiedOrder = async () => {
+      const orderPayload = {
         order_number: orderRef,
-        customer_name: formData.name || profile.fullName || 'Customer',
-        customer_email: formData.email || profile.email || 'customer@example.com',
+        customer_name: shippingDetails.name || profile.fullName || 'Customer',
+        customer_email: shippingDetails.email || profile.email || 'customer@example.com',
+        customer: shippingDetails,
         total_amount: total,
+        total: total,
         status: 'PENDING',
         payment_status: 'PAID',
+        paymentStatus: 'PAID',
+        payment_mode: 'UPI',
+        utr: cleanUtr,
+        gateway_payment_id: cleanUtr,
         items: cartItems.map((it) => ({
+          product_id: it.id || it.product_id,
           name: it.name || it.title,
           sku: it.sku || 'CUR-ITEM',
           size: it.size || 'One Size',
-          price: it.price || it.selling_price
+          price: it.price || it.selling_price || it.unit_price,
+          unit_price: it.price || it.selling_price || it.unit_price,
+          quantity: it.quantity || 1
         })),
-        shipping_address: formData,
+        shipping_address: shippingDetails,
         created_at: new Date().toISOString()
-      }]);
-    } catch (err) {
-      console.warn('Supabase orders table sync notice:', err);
-    }
+      };
 
-    // 3. Poll /api/check-payment status
+      // 1. POST request to create the order in the database with paymentStatus: "PAID"
+      try {
+        await fetch('/api/orders/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload)
+        });
+      } catch (err) {
+        console.warn('Backend order creation notice:', err);
+      }
+
+      // 2. Direct Supabase insert for instant Admin Dashboard (/nikhil) visibility
+      try {
+        await supabase.from('orders').insert([{
+          order_number: orderRef,
+          customer_name: orderPayload.customer_name,
+          customer_email: orderPayload.customer_email,
+          total_amount: total,
+          status: 'PENDING',
+          payment_status: 'PAID',
+          paymentStatus: 'PAID',
+          items: orderPayload.items,
+          shipping_address: shippingDetails,
+          created_at: orderPayload.created_at
+        }]);
+      } catch (err) {
+        console.warn('Supabase orders table sync notice:', err);
+      }
+
+      try {
+        localStorage.removeItem('checkout_shipping');
+      } catch (e) {}
+
+      return orderPayload;
+    };
+
+    // 1. First poll /api/check-payment status
     let attempts = 0;
     const maxAttempts = 10;
 
     const timer = setInterval(async () => {
       attempts++;
       try {
-        const res = await fetch(`/api/check-payment?utr=${encodeURIComponent(cleanUtr)}&amount=${total}&orderId=${encodeURIComponent(currentOrder?.id || orderRef)}`);
+        const res = await fetch(`/api/check-payment?utr=${encodeURIComponent(cleanUtr)}&amount=${total}&orderId=${encodeURIComponent(orderRef)}`);
         const data = await res.json();
 
+        // 2. Only when /api/check-payment returns status: "VERIFIED", make the POST request to create the order
         if (data && data.status === 'VERIFIED') {
           clearInterval(timer);
           setIsVerifyingUtr(false);
@@ -312,25 +322,23 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             text: '✅ Payment Verified! Processing your order...',
             type: 'success'
           });
+
+          const createdOrder = await createVerifiedOrder();
+
           setTimeout(() => {
+            setCurrentOrder(createdOrder);
             setStep('CONFIRMED');
             confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
             clearCart();
-            if (onOrderPlaced) onOrderPlaced(currentOrder || { order_number: orderRef });
-          }, 1500);
+            if (onOrderPlaced) onOrderPlaced(createdOrder);
+          }, 1200);
         } else if (attempts >= maxAttempts) {
           clearInterval(timer);
           setIsVerifyingUtr(false);
           setPaymentStatusMsg({
-            text: '⏳ Payment log pending. Our team will verify it shortly.',
+            text: '⏳ Payment verification timed out. Please check your UTR or contact support.',
             type: 'warning'
           });
-          setTimeout(() => {
-            setStep('CONFIRMED');
-            confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
-            clearCart();
-            if (onOrderPlaced) onOrderPlaced(currentOrder || { order_number: orderRef });
-          }, 2000);
         }
       } catch (err) {
         console.error('Polling error:', err);
@@ -338,16 +346,12 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
           clearInterval(timer);
           setIsVerifyingUtr(false);
           setPaymentStatusMsg({
-            text: '⏳ Payment log pending. Our team will verify it shortly.',
+            text: '⏳ Verification timed out. Please try again.',
             type: 'warning'
           });
-          setTimeout(() => {
-            setStep('CONFIRMED');
-            clearCart();
-          }, 2000);
         }
       }
-    }, 3000);
+    }, 2500);
   };
 
   const handleCopyUpi = () => {
