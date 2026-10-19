@@ -240,7 +240,9 @@ export default function App() {
                 reserved: 0
               }];
 
-          const deliveryCharge = parseFloat(p.delivery_charge !== undefined ? p.delivery_charge : p.deliveryCharge) || 0;
+          const deliveryCharge = parseFloat(
+            p.delivery_charge ?? p.deliveryCharge ?? p.measurements?.delivery_charge ?? p.cost_price
+          ) || 0;
 
           return {
             ...p,

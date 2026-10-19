@@ -483,13 +483,13 @@ export default function NikhilAdminDashboard({ onExit }) {
         condition_notes: form.conditionNotes.trim() || 'Pristine authentic 1-of-1 piece.',
         selling_price: parseFloat(form.sellingPrice),
         original_price: parseFloat(form.originalPrice) || parseFloat(form.sellingPrice) * 2,
-        delivery_charge: parseFloat(form.deliveryCharge) || 0,
-        deliveryCharge: parseFloat(form.deliveryCharge) || 0,
+        cost_price: parseFloat(form.deliveryCharge) || 0,
         measurements: {
           chest: parseFloat(form.chest) || 0,
           length: parseFloat(form.length) || 0,
           shoulder: parseFloat(form.shoulder) || 0,
           sleeve: parseFloat(form.sleeve) || 0,
+          delivery_charge: parseFloat(form.deliveryCharge) || 0,
           unit: 'in'
         },
         images: [publicUrl],
@@ -2106,8 +2106,16 @@ export default function NikhilAdminDashboard({ onExit }) {
                           }}>
                             {item.name}
                           </div>
-                          <div style={{ fontSize: '13px', fontWeight: 900, color: '#121212', marginTop: '2px' }}>
-                            ₹{price}
+                          <div style={{ fontSize: '13px', fontWeight: 900, color: '#121212', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>₹{price}</span>
+                            {(() => {
+                              const d = parseFloat(item.delivery_charge ?? item.deliveryCharge ?? item.cost_price ?? item.measurements?.delivery_charge) || 0;
+                              return d > 0 ? (
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#71717A' }}>
+                                  (+₹{d} del)
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
 
