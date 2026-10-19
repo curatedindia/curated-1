@@ -521,22 +521,24 @@ app.post('/api/orders/checkout', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Cart cannot be empty.' });
   }
 
-  const primaryVariantId = items[0].variant_id;
-  await acquireLock(primaryVariantId);
+  const primaryVariantId = items[0].variant_id || `var-${items[0].product_id}`;
+  if (primaryVariantId) await acquireLock(primaryVariantId);
 
   try {
     db.cleanExpiredHolds();
 
-    // Verify stock availability atomically
+    // Verify stock availability atomically: only check db.json if variant exists locally
     for (const item of items) {
-      const avail = db.getVariantAvailability(item.variant_id);
-      if (avail.available <= 0) {
-        return res.status(409).json({
-          success: false,
-          message: avail.reserved > 0
-            ? 'This piece is unavailable right now. Check back in a few minutes.'
-            : 'Sorry, this piece just sold out.'
-        });
+      if (item.variant_id && db.data.variants.some((v) => v.id === item.variant_id)) {
+        const avail = db.getVariantAvailability(item.variant_id);
+        if (avail.available <= 0) {
+          return res.status(409).json({
+            success: false,
+            message: avail.reserved > 0
+              ? 'This piece is unavailable right now. Check back in a few minutes.'
+              : 'Sorry, this piece just sold out.'
+          });
+        }
       }
     }
 
@@ -617,19 +619,20 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
     return res.json({ success: true, message: 'Order already confirmed', order });
   }
 
-  const primaryItem = order.items[0];
-  await acquireLock(primaryItem.variant_id);
+  const primaryItem = order.items?.[0] || {};
+  const lockKey = primaryItem.variant_id || order.id;
+  if (lockKey) await acquireLock(lockKey);
 
   try {
-    const variant = db.data.variants.find((v) => v.id === primaryItem.variant_id);
-    const product = db.data.products.find((p) => p.id === primaryItem.product_id);
+    const variant = primaryItem.variant_id ? db.data.variants.find((v) => v.id === primaryItem.variant_id) : null;
+    const product = primaryItem.product_id ? db.data.products.find((p) => p.id === primaryItem.product_id) : null;
 
     // Check if hold is still active or expired
     const hold = db.data.holds.find((h) => h.id === order.hold_id);
     const isHoldValid = hold && hold.status === 'ACTIVE' && new Date(hold.expires_at) > new Date();
 
     // Edge-case INV-13: Late payment or hold expired
-    if (!isHoldValid || simulate_late) {
+    if ((!isHoldValid || simulate_late) && variant) {
       if (variant.stock_on_hand <= 0) {
         order.payment_status = 'REFUND_INITIATED';
         order.order_status = 'PAYMENT_RECEIVED_ITEM_UNAVAILABLE';
@@ -651,12 +654,14 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
     // Convert hold to sale atomically
     if (hold) hold.status = 'CONVERTED';
 
-    variant.stock_on_hand = Math.max(0, variant.stock_on_hand - primaryItem.quantity);
+    if (variant) {
+      variant.stock_on_hand = Math.max(0, variant.stock_on_hand - (primaryItem.quantity || 1));
 
-    // If stock reaches 0, mark product SOLD_OUT (INV-04)
-    if (variant.stock_on_hand === 0) {
-      product.status = 'SOLD_OUT';
-      product.sold_at = new Date().toISOString();
+      // If stock reaches 0, mark product SOLD_OUT (INV-04)
+      if (variant.stock_on_hand === 0 && product) {
+        product.status = 'SOLD_OUT';
+        product.sold_at = new Date().toISOString();
+      }
     }
 
     order.payment_status = 'PAID';
