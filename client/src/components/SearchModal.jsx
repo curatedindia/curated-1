@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Sparkles, ArrowRight } from 'lucide-react';
+import supabase from '../supabaseClient';
 
 export default function SearchModal({ isOpen, onClose, onSelectProduct, onExploreShop }) {
   const [query, setQuery] = useState('');
@@ -23,13 +24,34 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products?search=${encodeURIComponent(query)}&is_admin=true`);
-        const data = await res.json();
-        if (data.success) {
-          // Sort available pieces first, sold out below (SF-10)
-          const sorted = [...data.products].sort((a, b) => {
-            const aAvail = a.total_available > 0 ? 1 : 0;
-            const bAvail = b.total_available > 0 ? 1 : 0;
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .or(`name.ilike.%${query}%,sku.ilike.%${query}%,category_id.ilike.%${query}%`);
+
+        if (error) {
+          console.error('Search error from Supabase:', error);
+        } else if (Array.isArray(data)) {
+          const normalized = data.map((p) => {
+            let imgs = p.images;
+            if (!Array.isArray(imgs)) {
+              if (p.image_url) imgs = [p.image_url];
+              else imgs = [];
+            }
+            return {
+              ...p,
+              name: p.title || p.name || 'Untitled Piece',
+              selling_price: parseFloat(p.selling_price) || 0,
+              original_price: p.original_price ? parseFloat(p.original_price) : null,
+              images: imgs,
+              image_url: imgs[0] || p.image_url || ''
+            };
+          });
+
+          // Sort available pieces first, sold out below
+          const sorted = normalized.sort((a, b) => {
+            const aAvail = (a.status !== 'SOLD_OUT' && (a.total_available === undefined || a.total_available > 0)) ? 1 : 0;
+            const bAvail = (b.status !== 'SOLD_OUT' && (b.total_available === undefined || b.total_available > 0)) ? 1 : 0;
             return bAvail - aAvail;
           });
           setResults(sorted);
@@ -159,8 +181,8 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
                 >
                   <img
-                    src={prod.images?.[0]}
-                    alt={prod.name}
+                    src={prod.images?.[0] || prod.image_url || ''}
+                    alt={prod.title || prod.name || 'Product'}
                     style={{ width: '50px', height: '62px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
                   />
                   <div style={{ flexGrow: 1 }}>
@@ -175,7 +197,7 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
                       )}
                     </div>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
-                      {prod.name}
+                      {prod.title || prod.name}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       SKU: {prod.sku} • {prod.condition}
@@ -183,7 +205,7 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct, onExplor
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      ₹{prod.selling_price}
+                      ₹{(parseFloat(prod.selling_price) || 0).toLocaleString('en-IN')}
                     </div>
                   </div>
                 </div>
