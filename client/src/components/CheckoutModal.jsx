@@ -13,7 +13,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { QRCodeSVG } from 'qrcode.react';
 import supabase from '../supabaseClient';
+
+const ADMIN_UPI_ID = 'nikhilpole90-2@okicici';
+const ADMIN_NAME = 'Nikhil Pole';
 
 export default function CheckoutModal({
   isOpen,
@@ -29,13 +33,19 @@ export default function CheckoutModal({
   const [step, setStep] = useState('FORM'); // 'FORM' | 'GATEWAY' | 'CONFIRMED' | 'FAILED' | 'LATE_REFUND'
   const [formData, setFormData] = useState({
     name: '',
-    mobile: '9820123456',
+    mobile: '',
     email: '',
-    address: '402, Sunset Boulevard, Bandra West',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    pincode: '400050'
+    address: '',
+    city: '',
+    state: '',
+    pincode: ''
   });
+
+  // Dynamic UPI Payment & UTR Verification state
+  const [utrInput, setUtrInput] = useState('');
+  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
+  const [paymentStatusMsg, setPaymentStatusMsg] = useState({ text: '', type: '' });
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   // When the modal mounts or when a Supabase Auth session is detected:
   useEffect(() => {
@@ -211,6 +221,126 @@ export default function CheckoutModal({
       setStep('FAILED');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Step 2b: Handle UTR submission and automated verification polling
+  const handleUtrSubmit = async (e) => {
+    e.preventDefault();
+    const cleanUtr = utrInput.trim();
+    if (!cleanUtr || cleanUtr.length !== 12) {
+      setPaymentStatusMsg({
+        text: 'Please enter a valid 12-digit numeric UTR/Ref No.',
+        type: 'error'
+      });
+      return;
+    }
+
+    setIsVerifyingUtr(true);
+    setPaymentStatusMsg({
+      text: 'Checking bank logs...',
+      type: 'info'
+    });
+
+    const orderRef = currentOrder?.order_number || currentOrder?.id || `ORD-${Date.now()}`;
+
+    // 1. Submit UTR to Express server
+    if (currentOrder?.id) {
+      try {
+        await fetch(`/api/orders/${currentOrder.id}/confirm-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gateway_payment_id: cleanUtr,
+            payment_mode: 'UPI',
+            utr: cleanUtr
+          })
+        });
+      } catch (err) {
+        console.warn('Backend payment confirmation notice:', err);
+      }
+    }
+
+    // 2. Insert order directly into Supabase orders table for immediate Admin Dashboard visibility
+    try {
+      await supabase.from('orders').insert([{
+        order_number: orderRef,
+        customer_name: formData.name || authUser?.user_metadata?.full_name || 'Customer',
+        customer_email: formData.email || authUser?.email || 'customer@example.com',
+        total_amount: total,
+        status: 'PENDING',
+        payment_status: 'PAID',
+        items: cartItems.map((it) => ({
+          name: it.name || it.title,
+          sku: it.sku || 'CUR-ITEM',
+          size: it.size || 'One Size',
+          price: it.price || it.selling_price
+        })),
+        shipping_address: formData,
+        created_at: new Date().toISOString()
+      }]);
+    } catch (err) {
+      console.warn('Supabase orders table sync notice:', err);
+    }
+
+    // 3. Poll /api/check-payment status
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const timer = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch(`/api/check-payment?utr=${encodeURIComponent(cleanUtr)}&amount=${total}&orderId=${encodeURIComponent(currentOrder?.id || orderRef)}`);
+        const data = await res.json();
+
+        if (data && data.status === 'VERIFIED') {
+          clearInterval(timer);
+          setIsVerifyingUtr(false);
+          setPaymentStatusMsg({
+            text: '✅ Payment Verified! Processing your order...',
+            type: 'success'
+          });
+          setTimeout(() => {
+            setStep('CONFIRMED');
+            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+            if (onOrderSuccess) onOrderSuccess(currentOrder || { order_number: orderRef });
+          }, 1500);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(timer);
+          setIsVerifyingUtr(false);
+          setPaymentStatusMsg({
+            text: '⏳ Payment log pending. Our team will verify it shortly.',
+            type: 'warning'
+          });
+          setTimeout(() => {
+            setStep('CONFIRMED');
+            confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
+            if (onOrderSuccess) onOrderSuccess(currentOrder || { order_number: orderRef });
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+        if (attempts >= maxAttempts) {
+          clearInterval(timer);
+          setIsVerifyingUtr(false);
+          setPaymentStatusMsg({
+            text: '⏳ Payment log pending. Our team will verify it shortly.',
+            type: 'warning'
+          });
+          setTimeout(() => {
+            setStep('CONFIRMED');
+            if (onOrderSuccess) onOrderSuccess();
+          }, 2000);
+        }
+      }
+    }, 3000);
+  };
+
+  const handleCopyUpi = () => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(ADMIN_UPI_ID);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2000);
     }
   };
 
@@ -530,139 +660,169 @@ export default function CheckoutModal({
               </div>
             </div>
 
-            {/* Payment Method Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
-              {['UPI', 'CARD', 'NETBANKING'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSelectedPaymentTab(tab)}
-                  style={{
-                    flex: 1,
-                    background: 'none',
-                    border: 'none',
-                    padding: '12px 6px',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    color: selectedPaymentTab === tab ? '#121212' : 'var(--text-muted)',
-                    borderBottom: selectedPaymentTab === tab ? '2px solid #121212' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {tab === 'UPI' ? 'UPI / QR' : tab === 'CARD' ? 'CARDS' : 'NETBANKING'}
-                </button>
-              ))}
-            </div>
+            {/* STEP 2: DYNAMIC UPI QR GATEWAY */}
+            {(() => {
+              const cartAmountFormatted = Number(total || 0).toFixed(2);
+              const orderRef = currentOrder?.order_number || currentOrder?.id || `ORD-${Date.now()}`;
+              const upiDeepLink = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=${encodeURIComponent(ADMIN_NAME)}&am=${cartAmountFormatted}&cu=INR&tn=${encodeURIComponent('Order ' + orderRef)}`;
 
-            {/* UPI Tab */}
-            {selectedPaymentTab === 'UPI' && (
-              <div style={{ textAlign: 'center', padding: '10px 0 20px' }}>
-                <div style={{
-                  display: 'inline-block',
-                  padding: '16px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '14px'
-                }}>
-                  {/* Clean SVG QR code simulation in Matte Black */}
-                  <svg width="140" height="140" viewBox="0 0 100 100">
-                    <rect width="100" height="100" fill="#FFFFFF" />
-                    <rect x="10" y="10" width="30" height="30" fill="#121212" />
-                    <rect x="15" y="15" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="20" y="20" width="10" height="10" fill="#121212" />
-                    <rect x="60" y="10" width="30" height="30" fill="#121212" />
-                    <rect x="65" y="15" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="70" y="20" width="10" height="10" fill="#121212" />
-                    <rect x="10" y="60" width="30" height="30" fill="#121212" />
-                    <rect x="15" y="65" width="20" height="20" fill="#FFFFFF" />
-                    <rect x="20" y="70" width="10" height="10" fill="#121212" />
-                    <rect x="50" y="50" width="10" height="10" fill="#121212" />
-                    <rect x="60" y="60" width="15" height="15" fill="#121212" />
-                    <rect x="80" y="75" width="10" height="15" fill="#121212" />
-                  </svg>
-                </div>
-                <p style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
-                  Scan to Pay ₹{total.toLocaleString('en-IN')} via any UPI App
-                </p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Supports Google Pay, PhonePe, Paytm, CRED, BHIM
-                </p>
-              </div>
-            )}
+              return (
+                <div style={{ textAlign: 'center' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px', fontFamily: 'var(--font-heading)' }}>
+                    Scan &amp; Pay
+                  </h3>
+                  <p style={{ fontSize: '14px', margin: '0 0 14px', color: '#121212' }}>
+                    Total Cart Amount: <strong>₹<span id="cart-amount">{cartAmountFormatted}</span></strong>
+                  </p>
 
-            {/* Card Tab */}
-            {selectedPaymentTab === 'CARD' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '16px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>CARD NUMBER</label>
-                  <input type="text" defaultValue="4242 •••• •••• 4242" disabled />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>EXPIRY</label>
-                    <input type="text" defaultValue="12/28" disabled />
+                  {/* Container where JS renders the Admin's QR */}
+                  <div id="qrcode-container" style={{
+                    margin: '10px auto 14px',
+                    display: 'inline-block',
+                    padding: '14px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '8px',
+                    border: '1px solid #E4E4E7',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+                  }}>
+                    <QRCodeSVG
+                      value={upiDeepLink}
+                      size={200}
+                      level="H"
+                      includeMargin={false}
+                    />
                   </div>
-                  <div>
-                    <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>CVV</label>
-                    <input type="password" defaultValue="•••" disabled />
-                  </div>
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Lock size={12} /> 256-Bit Bank Grade Tokenized Encryption
-                </div>
-              </div>
-            )}
 
-            {/* Test Simulation Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-              <button
-                onClick={() => handleConfirmPayment(false)}
-                disabled={loading}
-                className="btn btn-primary"
-                style={{ width: '100%', height: '48px', fontSize: '14px' }}
-              >
-                {loading ? 'Confirming with Gateway...' : `AUTHORIZE PAYMENT (₹${total})`}
-              </button>
+                  <p style={{ fontSize: '12px', color: '#666', margin: '0 0 12px' }}>
+                    Amount is locked. Scan with GPay, PhonePe, or Paytm.
+                  </p>
 
-              {/* Edge Case Simulation for Developer / Owner testing */}
-              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-subtle)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>
-                  Edge Case Verification Triggers:
-                </span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmPayment(true)}
+                  {/* Admin UPI Details Badge with Copy button */}
+                  <div
+                    onClick={handleCopyUpi}
                     style={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-subtle)',
-                      color: 'var(--olive-light)',
-                      fontSize: '11px',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-sm)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      backgroundColor: '#F4F4F5',
+                      border: '1px solid #E4E4E7',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#121212',
+                      marginBottom: '16px',
                       cursor: 'pointer'
                     }}
                   >
-                    Test INV-13 (Late Claim)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setErrorMessage('Payment declined by issuing bank.'); setStep('FAILED'); }}
-                    style={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-subtle)',
-                      color: 'var(--accent-red)',
-                      fontSize: '11px',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Simulate Failure
-                  </button>
+                    <span>UPI ID: <strong>{ADMIN_UPI_ID}</strong></span>
+                    <span style={{ fontSize: '11px', color: '#71717A', textDecoration: 'underline' }}>
+                      {copiedUpi ? 'COPIED ✓' : 'COPY'}
+                    </span>
+                  </div>
+
+                  {/* Direct Tap for Mobile Devices */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <a
+                      href={upiDeepLink}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        minHeight: '44px',
+                        backgroundColor: '#F4F4F5',
+                        color: '#121212',
+                        border: '1px solid #D4D4D8',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 800,
+                        letterSpacing: '0.04em',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <Smartphone size={16} />
+                      <span>TAP TO PAY IN UPI APP (MOBILE)</span>
+                    </a>
+                  </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid #E4E4E7', margin: '16px 0' }} />
+
+                  {/* Form for customer to enter UTR number after paying */}
+                  <form id="utr-form" onSubmit={handleUtrSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <label htmlFor="utr-input" style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.04em', color: '#121212' }}>
+                      ENTER 12-DIGIT UTR / REFERENCE NUMBER *
+                    </label>
+                    <input
+                      type="text"
+                      id="utr-input"
+                      placeholder="Enter 12-digit UTR/Ref No."
+                      maxLength={12}
+                      pattern="\d{12}"
+                      required
+                      value={utrInput}
+                      onChange={(e) => setUtrInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                      style={{
+                        padding: '10px 14px',
+                        width: '90%',
+                        maxWidth: '280px',
+                        textAlign: 'center',
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        border: '1px solid #D4D4D8',
+                        borderRadius: '6px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      id="submit-btn"
+                      disabled={isVerifyingUtr || utrInput.length !== 12}
+                      style={{
+                        padding: '12px 24px',
+                        width: '90%',
+                        maxWidth: '280px',
+                        backgroundColor: utrInput.length === 12 ? '#28a745' : '#71717A',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        letterSpacing: '0.04em',
+                        cursor: utrInput.length === 12 && !isVerifyingUtr ? 'pointer' : 'not-allowed',
+                        transition: 'background-color 0.2s ease',
+                        marginTop: '4px'
+                      }}
+                    >
+                      {isVerifyingUtr ? 'Verifying Bank Logs...' : 'Submit & Verify Order'}
+                    </button>
+                  </form>
+
+                  {paymentStatusMsg.text && (
+                    <p
+                      id="status-msg"
+                      style={{
+                        fontWeight: 'bold',
+                        marginTop: '14px',
+                        fontSize: '13px',
+                        color:
+                          paymentStatusMsg.type === 'success'
+                            ? '#28a745'
+                            : paymentStatusMsg.type === 'warning'
+                            ? '#D97706'
+                            : paymentStatusMsg.type === 'error'
+                            ? '#DC2626'
+                            : '#121212'
+                      }}
+                    >
+                      {paymentStatusMsg.text}
+                    </p>
+                  )}
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         )}
 

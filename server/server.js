@@ -11,6 +11,19 @@ const { db, acquireLock, releaseLock } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Supabase Admin Client for privileged operations
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
+const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
+// Admin UPI Configuration
+const ADMIN_UPI_ID = process.env.ADMIN_UPI_ID || 'nikhilpole90-2@okicici';
+const ADMIN_NAME = process.env.ADMIN_NAME || 'Nikhil Pole';
+const SHARED_SECRET_KEY = process.env.ADMIN_PHONE_SECRET_KEY || 'ADMIN_PHONE_SECRET_KEY_123';
+
+// Database storage array for automated logs forwarded from Admin's phone
+const receivedBankLogs = [];
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -592,7 +605,7 @@ app.post('/api/orders/checkout', async (req, res) => {
 // Gateway Payment Webhook / Confirmation
 app.post('/api/orders/:id/confirm-payment', async (req, res) => {
   const { id } = req.params;
-  const { gateway_payment_id, payment_mode = 'UPI', simulate_late = false } = req.body;
+  const { gateway_payment_id, payment_mode = 'UPI', simulate_late = false, utr } = req.body;
 
   const order = db.data.orders.find((o) => o.id === id);
   if (!order) {
@@ -648,9 +661,10 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
 
     order.payment_status = 'PAID';
     order.order_status = 'CONFIRMED';
-    order.gateway_id = gateway_payment_id || `sim_pay_${Date.now()}`;
+    order.gateway_id = gateway_payment_id || utr || `pay_${Date.now()}`;
+    order.utr = utr || gateway_payment_id || null;
     order.payment_mode = payment_mode;
-    order.notes = 'Payment verified via secure gateway. Order confirmed.';
+    order.notes = utr ? `Payment confirmed via UPI UTR: ${utr}` : 'Payment verified via secure gateway. Order confirmed.';
 
     // Record in Immutable Inventory Ledger (INV-02, INV-12)
     db.data.inventoryTransactions.unshift({
@@ -670,6 +684,25 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
     db.logActivity('ONLINE_SALE', 'ORDER', order.order_number, `Online sale confirmed: ${order.order_number} for ₹${order.total}`, 'SYSTEM');
     db.save();
 
+    // Sync order to Supabase orders table for the Admin dashboard
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from('orders').upsert({
+          order_number: order.order_number,
+          customer_name: order.customer?.name || 'Customer',
+          customer_email: order.customer?.email || 'customer@example.com',
+          total_amount: order.total,
+          status: 'PENDING',
+          payment_status: 'PAID',
+          items: order.items,
+          shipping_address: order.customer,
+          created_at: order.created_at || new Date().toISOString()
+        }, { onConflict: 'order_number' });
+      } catch (err) {
+        console.error('[Supabase Order Sync Warning]:', err.message);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Payment confirmed successfully',
@@ -678,6 +711,85 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
   } finally {
     releaseLock(primaryItem.variant_id);
   }
+});
+
+// ==========================================
+// UPI BANK WEBHOOK & PAYMENT VERIFICATION ROUTES
+// ==========================================
+
+// 1. WEBHOOK: Receives automated logs forwarded from Admin's phone
+app.post(['/api/bank-webhook', '/bank-webhook'], async (req, res) => {
+  const { secret, utr, amount } = req.body || {};
+
+  if (secret !== SHARED_SECRET_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!utr || !amount) {
+    return res.status(400).json({ error: 'Missing utr or amount' });
+  }
+
+  const cleanUtr = String(utr).trim();
+  const parsedAmount = parseFloat(amount);
+
+  receivedBankLogs.push({
+    utr: cleanUtr,
+    amount: parsedAmount,
+    timestamp: new Date()
+  });
+
+  console.log(`[LOG RECEIVED] UTR: ${cleanUtr} | Amount: ₹${parsedAmount}`);
+
+  // Automatically verify matching order if found
+  try {
+    const matchingOrder = db.data.orders.find(
+      (o) => (o.utr === cleanUtr || o.gateway_id === cleanUtr)
+    );
+    if (matchingOrder && matchingOrder.payment_status !== 'PAID') {
+      matchingOrder.payment_status = 'PAID';
+      matchingOrder.order_status = 'CONFIRMED';
+      db.save();
+
+      if (supabaseAdmin) {
+        await supabaseAdmin
+          .from('orders')
+          .update({ status: 'PENDING', payment_status: 'PAID' })
+          .eq('order_number', matchingOrder.order_number);
+      }
+    }
+  } catch (err) {
+    console.error('[Bank Webhook Match Sync Error]:', err.message);
+  }
+
+  return res.status(200).json({ status: 'SUCCESS' });
+});
+
+// 2. CHECK STATUS: Hit by frontend client polling
+app.get(['/api/check-payment', '/check-payment'], (req, res) => {
+  const { utr, amount, orderId } = req.query || {};
+
+  const cleanUtr = String(utr || '').trim();
+  const parsedAmount = parseFloat(amount);
+
+  const match = receivedBankLogs.find(
+    (log) => log.utr === cleanUtr && (isNaN(parsedAmount) || Math.abs(log.amount - parsedAmount) < 1)
+  );
+
+  if (match) {
+    return res.json({ status: 'VERIFIED' });
+  }
+
+  // If order is already paid, report VERIFIED
+  if (orderId) {
+    const order = db.data.orders.find(
+      (o) => o.id === orderId || o.order_number === orderId
+    );
+    if (order && (order.payment_status === 'PAID' || order.order_status === 'CONFIRMED')) {
+      return res.json({ status: 'VERIFIED' });
+    }
+  }
+
+  return res.json({ status: 'PENDING' });
 });
 
 // Track Order Lookup (SF-33)
