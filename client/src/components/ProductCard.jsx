@@ -4,7 +4,6 @@ import { Eye } from 'lucide-react';
 export default function ProductCard({ product, onSelectProduct }) {
   const isSoldOut = product.status === 'SOLD_OUT' || product.total_on_hand <= 0;
   const isHeld = !isSoldOut && product.total_available === 0 && product.total_reserved > 0;
-  const isOnlyOneLeft = !isSoldOut && !isHeld && product.total_available === 1;
 
   const primaryVariant = product.variants && product.variants[0];
   const sizeLabel = primaryVariant ? `Size ${primaryVariant.size}` : '';
@@ -140,21 +139,6 @@ export default function ProductCard({ product, onSelectProduct }) {
                 textTransform: 'uppercase'
               }}>
                 ON HOLD
-              </span>
-            ) : isOnlyOneLeft ? (
-              <span style={{
-                backgroundColor: '#FFFFFF',
-                color: 'var(--accent-red)',
-                border: '1px solid rgba(163, 61, 41, 0.3)',
-                fontSize: '9.5px',
-                fontFamily: 'var(--font-subheading)',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                padding: '2px 6px',
-                borderRadius: 'var(--radius-sm)',
-                textTransform: 'uppercase'
-              }}>
-                ONLY 1
               </span>
             ) : null}
           </div>
