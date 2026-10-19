@@ -29,178 +29,49 @@ import {
   Eye
 } from 'lucide-react';
 
-const CURATED_INITIAL_PRODUCTS = [
-  {
-    id: 'prod-001',
-    sku: 'CUR-TS-001',
-    name: 'Heavyweight Washed Vintage Boxy Tee',
-    slug: 'heavyweight-washed-vintage-boxy-tee',
-    category_id: 't-shirts',
-    subcategory_id: 'oversized',
-    description: 'Handpicked heavyweight cotton tee with a natural mineral wash. Dropped shoulders, reinforced double-needle collar, and zero side seams. Sourced from export surplus sample run.',
-    fabric: '100% Ring-Spun Heavyweight Cotton (240 GSM)',
-    fit: 'Oversized Boxy',
-    care: 'Machine wash cold inside out, hang dry only.',
-    condition: 'New / Unused',
-    condition_notes: 'Pristine unworn condition. Crisp neckline with zero stretching.',
-    selling_price: 899,
-    original_price: 1899,
-    is_new_drop: true,
-    status: 'ACTIVE',
-    images: ['/products/man_boxy_tee.jpg'],
-    variants: [
-      {
-        id: 'var-001',
-        product_id: 'prod-001',
-        size: 'L',
-        measurements: { chest: 46, length: 29.5, shoulder: 21, sleeve: 9.5, unit: 'in' },
-        on_hand: 1,
-        available: 1,
-        stock_on_hand: 1,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 1,
-    total_available: 1,
-    pieces_sold: 0
-  },
-  {
-    id: 'prod-003',
-    sku: 'CUR-SH-001',
-    name: 'Oversized Minimalist Utility Work Shirt',
-    slug: 'oversized-minimalist-utility-work-shirt',
-    category_id: 'shirts',
-    subcategory_id: 'workwear',
-    description: 'Relaxed drop-shoulder utility shirt in a crisp monochrome twill. Dual chest bellows pockets, matte buttons, and clean boxy drape.',
-    fabric: 'Heavyweight Cotton Twill (210 GSM)',
-    fit: 'Boxy / Relaxed',
-    care: 'Machine wash cold with like colors, hang dry.',
-    condition: 'New / Unused',
-    condition_notes: 'Crisp hand feel, reinforced collar and pocket stitching.',
-    selling_price: 1299,
-    original_price: 2499,
-    is_new_drop: true,
-    status: 'ACTIVE',
-    images: ['/products/man_utility_shirt.jpg'],
-    variants: [
-      {
-        id: 'var-003',
-        product_id: 'prod-003',
-        size: 'XL',
-        measurements: { chest: 48, length: 30, shoulder: 22, sleeve: 24.5, unit: 'in' },
-        on_hand: 1,
-        available: 1,
-        stock_on_hand: 1,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 1,
-    total_available: 1,
-    pieces_sold: 0
-  },
-  {
-    id: 'prod-006',
-    sku: 'CUR-HD-001',
-    name: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie',
-    slug: 'pigment-dyed-french-terry-drop-shoulder-hoodie',
-    category_id: 'hoodies',
-    subcategory_id: 'heavyweight',
-    description: 'Ultra-heavyweight 420 GSM French Terry hoodie in matte black. Dropped shoulders, double-layer hood without drawstrings, and tailored boxy hem.',
-    fabric: '100% French Terry Cotton (420 GSM)',
-    fit: 'Oversized / Dropped Shoulder',
-    care: 'Machine wash cold inside out, hang dry only.',
-    condition: 'New / Unused',
-    condition_notes: 'Flawless heavyweight structure with dense ribbing.',
-    selling_price: 1599,
-    original_price: 3299,
-    is_new_drop: true,
-    status: 'ACTIVE',
-    images: ['/products/man_street_hoodie.jpg'],
-    variants: [
-      {
-        id: 'var-006',
-        product_id: 'prod-006',
-        size: 'L',
-        measurements: { chest: 48, length: 28, shoulder: 23, sleeve: 25, unit: 'in' },
-        on_hand: 1,
-        available: 1,
-        stock_on_hand: 1,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 1,
-    total_available: 1,
-    pieces_sold: 0
-  },
-  {
-    id: 'prod-sold-001',
-    sku: 'CUR-HD-002',
-    name: 'Acid-Washed Distressed Heavyweight Hoodie',
-    slug: 'acid-washed-distressed-heavyweight-hoodie',
-    category_id: 'hoodies',
-    subcategory_id: 'archival',
-    description: 'Archival mineral acid-washed charcoal black hoodie with subtle edge grinding and sun-faded patina. One of one vintage piece.',
-    fabric: '100% Heavyweight Cotton Terry (400 GSM)',
-    fit: 'Relaxed Vintage Fit',
-    care: 'Dry clean or gentle hand wash cold.',
-    condition: 'Excellent - Pre-Owned',
-    condition_notes: 'Natural vintage fade, distressed cuffs, verified authentic archival garment.',
-    selling_price: 1699,
-    original_price: 3499,
-    is_new_drop: false,
-    status: 'SOLD_OUT',
-    images: ['/products/man_sold_hoodie.jpg'],
-    variants: [
-      {
-        id: 'var-sold-001',
-        product_id: 'prod-sold-001',
-        size: 'M',
-        measurements: { chest: 44, length: 27, shoulder: 20.5, sleeve: 24, unit: 'in' },
-        on_hand: 0,
-        available: 0,
-        stock_on_hand: 0,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 0,
-    total_available: 0,
-    pieces_sold: 1
-  },
-  {
-    id: 'prod-sold-002',
-    sku: 'CUR-SH-002',
-    name: 'Archival Faded Black Twill Workwear Overshirt',
-    slug: 'archival-faded-black-twill-workwear-overshirt',
-    category_id: 'shirts',
-    subcategory_id: 'vintage',
-    description: 'Boxy twill utility workwear shirt with dual chest flap pockets and tonal buttons in vintage faded black.',
-    fabric: 'Heavy Duty 100% Cotton Twill',
-    fit: 'Boxy Overshirt',
-    care: 'Machine wash cold with like colors, hang dry.',
-    condition: 'Excellent - Pre-Owned',
-    condition_notes: 'Clean vintage wash with beautifully softened twill fabric. All buttons intact.',
-    selling_price: 1399,
-    original_price: 2799,
-    is_new_drop: false,
-    status: 'SOLD_OUT',
-    images: ['/products/man_sold_shirt.jpg'],
-    variants: [
-      {
-        id: 'var-sold-002',
-        product_id: 'prod-sold-002',
-        size: 'L',
-        measurements: { chest: 46, length: 29, shoulder: 21, sleeve: 25, unit: 'in' },
-        on_hand: 0,
-        available: 0,
-        stock_on_hand: 0,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 0,
-    total_available: 0,
-    pieces_sold: 1
-  }
-];
+const ProductCardSkeleton = () => (
+  <div style={{
+    backgroundColor: 'var(--bg-surface)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--border-subtle)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
+  }}>
+    <div style={{
+      width: '100%',
+      paddingTop: '125%',
+      backgroundColor: '#F4F4F5',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          border: '2px solid #E4E4E7',
+          borderTopColor: '#121212',
+          animation: 'spin 1s linear infinite'
+        }} />
+      </div>
+    </div>
+    <div style={{ padding: '12px 10px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ height: '14px', backgroundColor: '#E4E4E7', borderRadius: '4px', width: '70%' }} />
+      <div style={{ height: '12px', backgroundColor: '#F4F4F5', borderRadius: '4px', width: '40%' }} />
+      <div style={{ height: '16px', backgroundColor: '#E4E4E7', borderRadius: '4px', width: '50%', marginTop: '4px' }} />
+    </div>
+  </div>
+);
 
 const DEFAULT_SETTINGS = {
   store_name: 'CURATED',
@@ -212,9 +83,9 @@ const DEFAULT_SETTINGS = {
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'shop' | 'new-drops' | 'sold-out' | 'track-order' | 'about' | 'contact' | 'admin' | 'policy-*'
-  const [products, setProducts] = useState(CURATED_INITIAL_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Filters & Sorting state
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -324,56 +195,105 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    fetchProductsAndSettings();
-  }, [categoryFilter, fitFilter, conditionFilter, sortBy]);
-
   const fetchProductsAndSettings = async () => {
     setLoading(true);
     try {
-      let url = `/api/products?sort=${sortBy}`;
-      if (categoryFilter) url += `&category=${encodeURIComponent(categoryFilter)}`;
-      if (fitFilter) url += `&fit=${encodeURIComponent(fitFilter)}`;
-      if (conditionFilter) url += `&condition=${encodeURIComponent(conditionFilter)}`;
+      // 1. Fetch live products from Supabase products table
+      let query = supabase.from('products').select('*');
 
-      const [prodRes, setRes] = await Promise.all([
-        fetch(url),
-        fetch('/api/settings')
-      ]);
-
-      const [prodData, setData] = await Promise.all([
-        prodRes.json(),
-        setRes.json()
-      ]);
-
-      if (prodData && prodData.success && Array.isArray(prodData.products) && prodData.products.length > 0) {
-        setProducts(prodData.products);
+      if (sortBy === 'price-low') {
+        query = query.order('selling_price', { ascending: true });
+      } else if (sortBy === 'price-high') {
+        query = query.order('selling_price', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
       }
-      if (setData && setData.success && setData.settings) {
-        setSettings(setData.settings);
+
+      const { data: supabaseProducts, error: prodError } = await query;
+
+      if (prodError) {
+        console.error('Error fetching products from Supabase:', prodError);
+      } else if (Array.isArray(supabaseProducts)) {
+        const normalized = supabaseProducts.map((p) => {
+          let imgs = p.images;
+          if (!Array.isArray(imgs)) {
+            if (p.image_url) imgs = [p.image_url];
+            else if (typeof imgs === 'string') {
+              try { imgs = JSON.parse(imgs); } catch { imgs = [imgs]; }
+            } else {
+              imgs = [];
+            }
+          }
+          if (p.image_url && !imgs.includes(p.image_url)) {
+            imgs = [p.image_url, ...imgs];
+          }
+
+          const primaryVariant = (Array.isArray(p.variants) && p.variants.length > 0)
+            ? p.variants
+            : [{
+                id: `var-${p.id}`,
+                product_id: p.id,
+                size: p.size || 'One Size',
+                on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                stock_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                reserved: 0
+              }];
+
+          return {
+            ...p,
+            name: p.title || p.name || 'Untitled Piece',
+            title: p.title || p.name || 'Untitled Piece',
+            selling_price: parseFloat(p.selling_price) || 0,
+            original_price: p.original_price ? parseFloat(p.original_price) : null,
+            image_url: imgs[0] || p.image_url || '',
+            images: imgs,
+            variants: primaryVariant,
+            category_id: p.category_id || p.category || 't-shirts',
+            condition: p.condition || 'New / Unused',
+            total_available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+            total_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1)
+          };
+        });
+        setProducts(normalized);
+      }
+
+      // 2. Fetch settings
+      try {
+        const { data: setRes } = await supabase.from('settings').select('*').single();
+        if (setRes) {
+          setSettings((prev) => ({ ...prev, ...setRes }));
+        }
+      } catch (e) {
+        // default settings remain active
       }
     } catch (err) {
-      console.error('Error fetching storefront data:', err);
+      console.error('Error fetching storefront data from Supabase:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchProductsAndSettings();
+  }, [sortBy]);
+
   const handleAddToCart = (product, variant) => {
     setCartItems((prev) => {
-      const exists = prev.find((it) => it.variant_id === variant.id);
+      const variantId = variant?.id || `var-${product.id}`;
+      const exists = prev.find((it) => it.variant_id === variantId);
       if (exists) return prev; // 1-of-1 rule, max quantity is 1
       return [
         ...prev,
         {
           product_id: product.id,
-          variant_id: variant.id,
-          name: product.name,
+          variant_id: variantId,
+          name: product.title || product.name,
           sku: product.sku,
-          size: variant.size,
+          size: variant?.size || 'One Size',
           quantity: 1,
-          unit_price: product.selling_price,
-          image: product.images?.[0]
+          unit_price: parseFloat(product.selling_price) || 0,
+          image: (Array.isArray(product.images) && product.images[0]) || product.image_url || ''
         }
       ];
     });
@@ -390,8 +310,16 @@ export default function App() {
   };
 
   // Filtered views
-  const newDropProducts = products.filter((p) => p.is_new_drop && p.total_available > 0);
-  const availableShopProducts = products.filter((p) => p.total_available > 0);
+  const availableShopProducts = products.filter((p) => {
+    const isAvail = p.status !== 'SOLD_OUT' && (p.total_available === undefined || p.total_available === null || p.total_available > 0);
+    if (!isAvail) return false;
+    if (categoryFilter && p.category_id?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
+    if (conditionFilter && p.condition?.toLowerCase() !== conditionFilter.toLowerCase()) return false;
+    if (fitFilter && p.fit && !p.fit.toLowerCase().includes(fitFilter.toLowerCase())) return false;
+    return true;
+  });
+
+  const newDropProducts = availableShopProducts.filter((p) => p.is_new_drop);
 
   // Tab-filtered products for Homepage Tab Collections
   const tabProducts = homeTab === 'all'
@@ -550,15 +478,25 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="product-grid">
-                  {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).slice(0, 4).map((prod) => (
-                    <ProductCard
-                      key={prod.id}
-                      product={prod}
-                      onSelectProduct={(p) => setSelectedProduct(p)}
-                    />
-                  ))}
-                </div>
+                {loading ? (
+                  <div className="product-grid">
+                    {[1, 2, 3, 4].map((i) => <ProductCardSkeleton key={i} />)}
+                  </div>
+                ) : (newDropProducts.length > 0 ? newDropProducts : availableShopProducts).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    No drop pieces available at the moment. Check back soon.
+                  </div>
+                ) : (
+                  <div className="product-grid">
+                    {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).slice(0, 4).map((prod) => (
+                      <ProductCard
+                        key={prod.id}
+                        product={prod}
+                        onSelectProduct={(p) => setSelectedProduct(p)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 
@@ -633,15 +571,25 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="product-grid">
-                  {tabProducts.slice(0, 8).map((prod) => (
-                    <ProductCard
-                      key={prod.id}
-                      product={prod}
-                      onSelectProduct={(p) => setSelectedProduct(p)}
-                    />
-                  ))}
-                </div>
+                {loading ? (
+                  <div className="product-grid">
+                    {[1, 2, 3, 4].map((i) => <ProductCardSkeleton key={i} />)}
+                  </div>
+                ) : tabProducts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    No pieces found in this category.
+                  </div>
+                ) : (
+                  <div className="product-grid">
+                    {tabProducts.slice(0, 8).map((prod) => (
+                      <ProductCard
+                        key={prod.id}
+                        product={prod}
+                        onSelectProduct={(p) => setSelectedProduct(p)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 
@@ -885,8 +833,8 @@ export default function App() {
             </div>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                Loading pieces...
+              <div className="product-grid">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <ProductCardSkeleton key={i} />)}
               </div>
             ) : availableShopProducts.length === 0 ? (
               <div style={{
@@ -948,15 +896,25 @@ export default function App() {
               </h1>
             </div>
 
-            <div className="product-grid">
-              {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).map((prod) => (
-                <ProductCard
-                  key={prod.id}
-                  product={prod}
-                  onSelectProduct={(p) => setSelectedProduct(p)}
-                />
-              ))}
-            </div>
+            {loading ? (
+              <div className="product-grid">
+                {[1, 2, 3, 4].map((i) => <ProductCardSkeleton key={i} />)}
+              </div>
+            ) : (newDropProducts.length > 0 ? newDropProducts : availableShopProducts).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No active drop pieces found.
+              </div>
+            ) : (
+              <div className="product-grid">
+                {(newDropProducts.length > 0 ? newDropProducts : availableShopProducts).map((prod) => (
+                  <ProductCard
+                    key={prod.id}
+                    product={prod}
+                    onSelectProduct={(p) => setSelectedProduct(p)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

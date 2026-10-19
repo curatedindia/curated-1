@@ -1,93 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
-
-const DEFAULT_SOLD_PRODUCTS = [
-  {
-    id: 'prod-sold-001',
-    sku: 'CUR-HD-002',
-    name: 'Acid-Washed Distressed Heavyweight Hoodie',
-    slug: 'acid-washed-distressed-heavyweight-hoodie',
-    category_id: 'hoodies',
-    subcategory_id: 'archival',
-    description: 'Archival mineral acid-washed charcoal black hoodie with subtle edge grinding and sun-faded patina. One of one vintage piece.',
-    fabric: '100% Heavyweight Cotton Terry (400 GSM)',
-    fit: 'Relaxed Vintage Fit',
-    condition: 'Excellent - Pre-Owned',
-    condition_notes: 'Natural vintage fade, distressed cuffs, verified authentic archival garment.',
-    selling_price: 1699,
-    original_price: 3499,
-    is_new_drop: false,
-    status: 'SOLD_OUT',
-    images: ['/products/man_sold_hoodie.jpg'],
-    variants: [
-      {
-        id: 'var-sold-001',
-        product_id: 'prod-sold-001',
-        size: 'M',
-        measurements: { chest: 44, length: 27, shoulder: 20.5, sleeve: 24, unit: 'in' },
-        on_hand: 0,
-        available: 0,
-        stock_on_hand: 0,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 0,
-    total_available: 0,
-    pieces_sold: 1
-  },
-  {
-    id: 'prod-sold-002',
-    sku: 'CUR-SH-002',
-    name: 'Archival Faded Black Twill Workwear Overshirt',
-    slug: 'archival-faded-black-twill-workwear-overshirt',
-    category_id: 'shirts',
-    subcategory_id: 'vintage',
-    description: 'Boxy twill utility workwear shirt with dual chest flap pockets and tonal buttons in vintage faded black.',
-    fabric: 'Heavy Duty 100% Cotton Twill',
-    fit: 'Boxy Overshirt',
-    condition: 'Excellent - Pre-Owned',
-    condition_notes: 'Clean vintage wash with beautifully softened twill fabric. All buttons intact.',
-    selling_price: 1399,
-    original_price: 2799,
-    is_new_drop: false,
-    status: 'SOLD_OUT',
-    images: ['/products/man_sold_shirt.jpg'],
-    variants: [
-      {
-        id: 'var-sold-002',
-        product_id: 'prod-sold-002',
-        size: 'L',
-        measurements: { chest: 46, length: 29, shoulder: 21, sleeve: 25, unit: 'in' },
-        on_hand: 0,
-        available: 0,
-        stock_on_hand: 0,
-        reserved: 0
-      }
-    ],
-    total_on_hand: 0,
-    total_available: 0,
-    pieces_sold: 1
-  }
-];
+import supabase from '../supabaseClient';
 
 export default function SoldOutView({ onSelectProduct, onExploreNewDrops }) {
-  const [soldProducts, setSoldProducts] = useState(DEFAULT_SOLD_PRODUCTS);
-  const [loading, setLoading] = useState(false);
+  const [soldProducts, setSoldProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSoldProducts();
   }, []);
 
   const fetchSoldProducts = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/products?view=sold-out&is_admin=true');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.products)) {
-        // Only products that have at least one verified sale
-        const filtered = data.products.filter((p) => p.status === 'SOLD_OUT' && p.pieces_sold > 0);
-        if (filtered.length > 0) {
-          setSoldProducts(filtered);
-        }
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('status', 'SOLD_OUT')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load sold archive from Supabase:', error);
+      } else if (Array.isArray(data)) {
+        const normalized = data.map((p) => {
+          let imgs = p.images;
+          if (!Array.isArray(imgs)) {
+            if (p.image_url) imgs = [p.image_url];
+            else imgs = [];
+          }
+          return {
+            ...p,
+            name: p.title || p.name || 'Archived Piece',
+            selling_price: parseFloat(p.selling_price) || 0,
+            images: imgs,
+            image_url: imgs[0] || p.image_url || '',
+            pieces_sold: p.pieces_sold || 1
+          };
+        });
+        setSoldProducts(normalized);
       }
     } catch (err) {
       console.error('Failed to load sold archive:', err);
@@ -157,8 +107,8 @@ export default function SoldOutView({ onSelectProduct, onExploreNewDrops }) {
               {/* Image Container with Muted Grayscale Overlay */}
               <div style={{ position: 'relative', width: '100%', paddingTop: '125%', backgroundColor: 'var(--bg-secondary)' }}>
                 <img
-                  src={product.images?.[0]}
-                  alt={product.name}
+                  src={product.images?.[0] || product.image_url || ''}
+                  alt={product.title || product.name || 'Archived piece'}
                   loading="lazy"
                   style={{
                     position: 'absolute',
@@ -194,12 +144,12 @@ export default function SoldOutView({ onSelectProduct, onExploreNewDrops }) {
                   {product.category_id}
                 </div>
                 <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: 1.4 }}>
-                  {product.name}
+                  {product.title || product.name}
                 </h3>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
                   <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    ₹{product.selling_price.toLocaleString('en-IN')}
+                    ₹{(parseFloat(product.selling_price) || 0).toLocaleString('en-IN')}
                   </span>
                   <span style={{ fontSize: '12px', color: 'var(--olive-light)', fontWeight: 600 }}>
                     {product.pieces_sold} {product.pieces_sold === 1 ? 'piece sold' : 'pieces sold'}

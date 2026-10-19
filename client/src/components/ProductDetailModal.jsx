@@ -130,8 +130,8 @@ export default function ProductDetailModal({
               marginBottom: '12px'
             }}>
               <img
-                src={product.images?.[activeImageIndex] || product.images?.[0]}
-                alt={product.name}
+                src={product.images?.[activeImageIndex] || product.images?.[0] || product.image_url || ''}
+                alt={product.title || product.name || 'Product'}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -228,17 +228,17 @@ export default function ProductDetailModal({
             </div>
 
             <h1 style={{ fontSize: '24px', fontWeight: 700, lineHeight: 1.3, marginBottom: '14px', color: 'var(--text-primary)' }}>
-              {product.name}
+              {product.title || product.name}
             </h1>
 
             {/* Pricing Section */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '20px' }}>
               <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
-                ₹{product.selling_price.toLocaleString('en-IN')}
+                ₹{(parseFloat(product.selling_price) || 0).toLocaleString('en-IN')}
               </span>
-              {product.original_price && product.original_price > product.selling_price && (
+              {product.original_price && parseFloat(product.original_price) > (parseFloat(product.selling_price) || 0) && (
                 <span style={{ fontSize: '15px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                  ₹{product.original_price.toLocaleString('en-IN')}
+                  ₹{(parseFloat(product.original_price) || 0).toLocaleString('en-IN')}
                 </span>
               )}
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>

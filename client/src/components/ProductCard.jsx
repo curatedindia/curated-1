@@ -8,7 +8,12 @@ export default function ProductCard({ product, onSelectProduct }) {
   const primaryVariant = product.variants && product.variants[0];
   const sizeLabel = primaryVariant ? `Size ${primaryVariant.size}` : '';
 
-  const hasDiscount = product.original_price && product.original_price > product.selling_price;
+  const sellingPrice = parseFloat(product.selling_price) || 0;
+  const originalPrice = parseFloat(product.original_price) || 0;
+  const hasDiscount = originalPrice > sellingPrice;
+
+  const displayImage = (Array.isArray(product.images) && product.images[0]) || product.image_url || product.image || '';
+  const displayTitle = product.title || product.name || 'Untitled Piece';
 
   return (
     <div
@@ -44,8 +49,8 @@ export default function ProductCard({ product, onSelectProduct }) {
         overflow: 'hidden'
       }}>
         <img
-          src={product.images && product.images[0]}
-          alt={product.name}
+          src={displayImage}
+          alt={displayTitle}
           loading="lazy"
           style={{
             position: 'absolute',
@@ -196,13 +201,13 @@ export default function ProductCard({ product, onSelectProduct }) {
             overflow: 'hidden',
             minHeight: '34px'
           }}>
-            {product.name}
+            {displayTitle}
           </h3>
         </div>
 
         {/* Condition Grade and Size */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '10.5px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 500 }}>{product.condition}</span>
+          <span style={{ fontWeight: 500 }}>{product.condition || 'New / Unused'}</span>
           {sizeLabel && (
             <>
               <span>•</span>
@@ -219,7 +224,7 @@ export default function ProductCard({ product, onSelectProduct }) {
             fontFamily: 'var(--font-body)',
             color: 'var(--text-primary)'
           }}>
-            Rs. {product.selling_price?.toLocaleString('en-IN')}
+            Rs. {sellingPrice.toLocaleString('en-IN')}
           </span>
           {hasDiscount && (
             <span style={{
@@ -227,7 +232,7 @@ export default function ProductCard({ product, onSelectProduct }) {
               color: 'var(--text-muted)',
               textDecoration: 'line-through'
             }}>
-              Rs. {product.original_price?.toLocaleString('en-IN')}
+              Rs. {originalPrice.toLocaleString('en-IN')}
             </span>
           )}
         </div>
