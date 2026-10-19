@@ -73,9 +73,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // Subtotal & Shipping calculation
-    const subtotal = items.reduce((sum, it) => sum + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
-    const shipping = subtotal >= 1499 ? 0 : 99;
+    // Subtotal & Delivery Charge calculation
+    const subtotal = items.reduce((sum, it) => sum + (Number(it.unit_price || it.price || it.selling_price) || 0) * (Number(it.quantity) || 1), 0);
+    const itemDeliveryCharges = items.reduce((sum, it) => {
+      const charge = it.deliveryCharge !== undefined && it.deliveryCharge !== null && it.deliveryCharge !== ''
+        ? Number(it.deliveryCharge)
+        : (it.delivery_charge !== undefined && it.delivery_charge !== null && it.delivery_charge !== ''
+          ? Number(it.delivery_charge)
+          : null);
+      return charge !== null ? sum + charge : sum;
+    }, 0);
+    const hasCustomDelivery = items.some((it) => (it.deliveryCharge !== undefined && it.deliveryCharge !== null && it.deliveryCharge !== '') || (it.delivery_charge !== undefined && it.delivery_charge !== null && it.delivery_charge !== ''));
+    const standardShipping = subtotal >= 1499 ? 0 : 99;
+    const shipping = hasCustomDelivery ? itemDeliveryCharges : standardShipping;
     const total = subtotal + shipping;
 
     const timestamp = Date.now();

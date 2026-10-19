@@ -47,11 +47,24 @@ export default function CartDrawer({
 
   if (!isOpen) return null;
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (Number(item.unit_price || item.selling_price || 0) * (item.quantity || 1)), 0);
+
+  const productDeliveryCharges = cartItems.reduce((sum, item) => {
+    const charge = item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== ''
+      ? Number(item.deliveryCharge)
+      : (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''
+        ? Number(item.delivery_charge)
+        : null);
+    return charge !== null ? sum + charge : sum;
+  }, 0);
+
+  const hasItemDeliveryCharge = cartItems.some((item) => (item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== '') || (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''));
+
   const freeShippingThreshold = settings?.shipping_free_threshold || 1499;
   const flatShippingRate = settings?.shipping_flat_rate || 99;
   const isFreeShipping = subtotal >= freeShippingThreshold;
-  const shippingFee = isFreeShipping ? 0 : flatShippingRate;
+  const standardShipping = isFreeShipping ? 0 : flatShippingRate;
+  const shippingFee = hasItemDeliveryCharge ? productDeliveryCharges : standardShipping;
   const total = subtotal + shippingFee;
 
   const hasUnavailableItems = unavailableItemIds.length > 0;
@@ -205,8 +218,8 @@ export default function CartDrawer({
                 <span>₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Estimated Express Shipping</span>
-                <span>{isFreeShipping ? <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>FREE</span> : `₹${flatShippingRate}`}</span>
+                <span>Delivery Charge</span>
+                <span>{shippingFee === 0 ? <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>FREE</span> : `₹${shippingFee}`}</span>
               </div>
               <div style={{
                 display: 'flex',

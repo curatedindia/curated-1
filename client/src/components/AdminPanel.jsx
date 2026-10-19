@@ -58,7 +58,8 @@ export default function AdminPanel({ onExitAdmin }) {
     condition_notes: 'Flawless condition, verified neckline tension.',
     selling_price: 799,
     original_price: 1599,
-    cost_price: 280,
+    delivery_charge: 0,
+    cost_price: 0,
     source_type: 'Brand Surplus',
     source_name: 'Standard Sourcing Lot',
     lot_ref: 'LOT-2026-OCT',
@@ -808,11 +809,11 @@ export default function AdminPanel({ onExitAdmin }) {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>INTERNAL COST (₹)</label>
+                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>DELIVERY CHARGE (₹)</label>
                   <input
                     type="number"
-                    value={productForm.cost_price}
-                    onChange={(e) => setProductForm({ ...productForm, cost_price: e.target.value })}
+                    value={productForm.delivery_charge ?? 0}
+                    onChange={(e) => setProductForm({ ...productForm, delivery_charge: e.target.value })}
                   />
                 </div>
               </div>

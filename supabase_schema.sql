@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   condition_notes TEXT,
   selling_price NUMERIC(10, 2) NOT NULL,
   original_price NUMERIC(10, 2),
+  delivery_charge NUMERIC(10, 2) DEFAULT 0,
   cost_price NUMERIC(10, 2) DEFAULT 0,
   measurements JSONB DEFAULT '{"chest": 0, "length": 0, "shoulder": 0, "sleeve": 0, "unit": "in"}'::jsonb,
   images TEXT[] DEFAULT ARRAY[]::TEXT[],
@@ -30,6 +31,9 @@ CREATE TABLE IF NOT EXISTS public.products (
   pieces_sold INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure delivery_charge column exists if table is already created
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS delivery_charge NUMERIC(10, 2) DEFAULT 0;
 
 -- 2. ENABLE ROW LEVEL SECURITY (RLS) ON PRODUCTS TABLE
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;

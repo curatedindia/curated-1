@@ -262,6 +262,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
           size: it.size || 'One Size',
           price: it.price || it.selling_price || it.unit_price,
           unit_price: it.price || it.selling_price || it.unit_price,
+          delivery_charge: it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0),
           quantity: it.quantity || 1
         })),
         shipping_address: shippingDetails,
@@ -557,9 +558,9 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
                   <span style={{ fontWeight: 600, color: '#121212' }}>₹{subtotal.toLocaleString('en-IN')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Express Domestic Shipping</span>
-                  <span style={{ color: '#2E7D32', fontWeight: 700 }}>
-                    {isFreeShipping ? 'FREE' : `₹${shippingFee}`}
+                  <span>Delivery Charge</span>
+                  <span style={{ color: shippingFee === 0 ? '#2E7D32' : '#121212', fontWeight: 700 }}>
+                    {shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}
                   </span>
                 </div>
                 <div style={{

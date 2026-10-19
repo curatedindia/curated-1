@@ -240,12 +240,16 @@ export default function App() {
                 reserved: 0
               }];
 
+          const deliveryCharge = parseFloat(p.delivery_charge !== undefined ? p.delivery_charge : p.deliveryCharge) || 0;
+
           return {
             ...p,
             name: p.title || p.name || 'Untitled Piece',
             title: p.title || p.name || 'Untitled Piece',
             selling_price: parseFloat(p.selling_price) || 0,
             original_price: p.original_price ? parseFloat(p.original_price) : null,
+            delivery_charge: deliveryCharge,
+            deliveryCharge: deliveryCharge,
             image_url: imgs[0] || p.image_url || '',
             images: imgs,
             variants: primaryVariant,
@@ -283,6 +287,7 @@ export default function App() {
       const variantId = variant?.id || `var-${product.id}`;
       const exists = prev.find((it) => it.variant_id === variantId);
       if (exists) return prev; // 1-of-1 rule, max quantity is 1
+      const itemDeliveryCharge = parseFloat(product.delivery_charge !== undefined ? product.delivery_charge : product.deliveryCharge) || 0;
       return [
         ...prev,
         {
@@ -293,6 +298,9 @@ export default function App() {
           size: variant?.size || 'One Size',
           quantity: 1,
           unit_price: parseFloat(product.selling_price) || 0,
+          selling_price: parseFloat(product.selling_price) || 0,
+          delivery_charge: itemDeliveryCharge,
+          deliveryCharge: itemDeliveryCharge,
           image: (Array.isArray(product.images) && product.images[0]) || product.image_url || ''
         }
       ];

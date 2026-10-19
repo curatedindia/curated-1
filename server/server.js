@@ -224,6 +224,8 @@ app.post('/api/products', (req, res) => {
     condition_notes,
     selling_price,
     original_price,
+    delivery_charge,
+    deliveryCharge,
     cost_price,
     source_type,
     source_name,
@@ -279,6 +281,8 @@ app.post('/api/products', (req, res) => {
     condition_notes: condition_notes || 'Clean condition, verified quality.',
     selling_price: Number(selling_price),
     original_price: original_price ? Number(original_price) : null,
+    delivery_charge: Number(delivery_charge !== undefined ? delivery_charge : (deliveryCharge !== undefined ? deliveryCharge : 0)),
+    deliveryCharge: Number(delivery_charge !== undefined ? delivery_charge : (deliveryCharge !== undefined ? deliveryCharge : 0)),
     cost_price: Number(cost_price || 0),
     source_type: source_type || 'Brand Surplus',
     source_name: source_name || 'Standard Sourcing Lot',
@@ -353,6 +357,12 @@ app.put('/api/products/:id', (req, res) => {
 
   if (updates.selling_price && Number(updates.selling_price) !== previousPrice) {
     db.logActivity('PRICE_CHANGE', 'PRODUCT', product.id, `Price updated from ₹${previousPrice} to ₹${updates.selling_price}`, 'Nikhil Pol');
+  }
+
+  if (updates.delivery_charge !== undefined || updates.deliveryCharge !== undefined) {
+    const charge = Number(updates.delivery_charge !== undefined ? updates.delivery_charge : updates.deliveryCharge) || 0;
+    product.delivery_charge = charge;
+    product.deliveryCharge = charge;
   }
 
   // Update variant stock if supplied

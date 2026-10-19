@@ -103,10 +103,23 @@ export default function CheckoutModal({
   const [selectedPaymentTab, setSelectedPaymentTab] = useState('UPI');
 
   // Subtotal & Shipping calculation
-  const subtotal = cartItems.reduce((sum, it) => sum + it.unit_price * it.quantity, 0);
+  const subtotal = cartItems.reduce((sum, it) => sum + (Number(it.unit_price || it.selling_price || 0) * (it.quantity || 1)), 0);
+
+  const productDeliveryCharges = cartItems.reduce((sum, item) => {
+    const charge = item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== ''
+      ? Number(item.deliveryCharge)
+      : (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''
+        ? Number(item.delivery_charge)
+        : null);
+    return charge !== null ? sum + charge : sum;
+  }, 0);
+
+  const hasItemDeliveryCharge = cartItems.some((item) => (item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== '') || (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''));
+
   const freeThreshold = settings?.shipping_free_threshold || 1499;
   const flatShipping = settings?.shipping_flat_rate || 99;
-  const shipping = subtotal >= freeThreshold ? 0 : flatShipping;
+  const standardShipping = subtotal >= freeThreshold ? 0 : flatShipping;
+  const shipping = hasItemDeliveryCharge ? productDeliveryCharges : standardShipping;
   const total = subtotal + shipping;
 
   // Countdown timer for 10-minute hold (INV-10)
@@ -274,6 +287,7 @@ export default function CheckoutModal({
           size: it.size || 'One Size',
           price: it.price || it.selling_price || it.unit_price,
           unit_price: it.price || it.selling_price || it.unit_price,
+          delivery_charge: it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0),
           quantity: it.quantity || 1
         })),
         shipping_address: shippingDetails,

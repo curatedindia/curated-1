@@ -75,7 +75,7 @@ export default function NikhilAdminDashboard({ onExit }) {
     conditionGrade: 'New / Unused',
     sellingPrice: '',
     originalPrice: '',
-    internalCost: '',
+    deliveryCharge: 0,
     chest: '',
     length: '',
     shoulder: '',
@@ -483,7 +483,8 @@ export default function NikhilAdminDashboard({ onExit }) {
         condition_notes: form.conditionNotes.trim() || 'Pristine authentic 1-of-1 piece.',
         selling_price: parseFloat(form.sellingPrice),
         original_price: parseFloat(form.originalPrice) || parseFloat(form.sellingPrice) * 2,
-        cost_price: parseFloat(form.internalCost) || 0,
+        delivery_charge: parseFloat(form.deliveryCharge) || 0,
+        deliveryCharge: parseFloat(form.deliveryCharge) || 0,
         measurements: {
           chest: parseFloat(form.chest) || 0,
           length: parseFloat(form.length) || 0,
@@ -528,7 +529,7 @@ export default function NikhilAdminDashboard({ onExit }) {
         conditionGrade: 'New / Unused',
         sellingPrice: '',
         originalPrice: '',
-        internalCost: '',
+        deliveryCharge: 0,
         chest: '',
         length: '',
         shoulder: '',
@@ -1842,18 +1843,18 @@ export default function NikhilAdminDashboard({ onExit }) {
                   </div>
                 </div>
 
-                {/* Internal Cost */}
+                {/* Delivery Charge */}
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 800, color: '#71717A', display: 'block', marginBottom: '4px' }}>
-                    INTERNAL SOURCING COST (₹)
+                    DELIVERY CHARGE (₹)
                   </label>
                   <input
-                    name="internalCost"
+                    name="deliveryCharge"
                     type="number"
                     min="0"
-                    value={form.internalCost}
+                    value={form.deliveryCharge}
                     onChange={handleFormChange}
-                    placeholder="650"
+                    placeholder="0"
                     style={{
                       width: '100%',
                       minHeight: '44px',

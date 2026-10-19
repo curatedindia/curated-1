@@ -146,11 +146,27 @@ export function useCheckoutAuth() {
   }, [extractProfile]);
 
   // Cart financial summary calculations
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.unit_price || 0) * (item.quantity || 1), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (Number(item.unit_price || item.selling_price || 0) * (item.quantity || 1)), 0);
+
+  // Dynamic delivery charge calculation (Selling Price + Delivery Charge)
+  const productDeliveryCharges = cartItems.reduce((sum, item) => {
+    const charge = item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== ''
+      ? Number(item.deliveryCharge)
+      : (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''
+        ? Number(item.delivery_charge)
+        : null);
+    return charge !== null ? sum + charge : sum;
+  }, 0);
+
+  const hasItemDeliveryCharge = cartItems.some((item) => (item.deliveryCharge !== undefined && item.deliveryCharge !== null && item.deliveryCharge !== '') || (item.delivery_charge !== undefined && item.delivery_charge !== null && item.delivery_charge !== ''));
+
   const freeShippingThreshold = 1499;
   const flatShippingRate = 99;
   const isFreeShipping = subtotal >= freeShippingThreshold;
-  const shippingFee = isFreeShipping ? 0 : flatShippingRate;
+  const standardShipping = isFreeShipping ? 0 : flatShippingRate;
+
+  // If piece has custom delivery charge configured, use it; otherwise fallback to standard shipping
+  const shippingFee = hasItemDeliveryCharge ? productDeliveryCharges : standardShipping;
   const total = subtotal + shippingFee;
 
   const clearCart = useCallback(() => {
