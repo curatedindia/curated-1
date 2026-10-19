@@ -37,96 +37,6 @@ import supabase from '../supabaseClient';
 
 const REQUIRED_ADMIN_EMAIL = 'hello.curatedindia@gmail.com';
 
-// Fallback initial orders if Supabase orders table is newly created or empty
-const SEED_FALLBACK_ORDERS = [
-  {
-    id: 'ord-1791794829611',
-    order_number: 'CUR-1003',
-    customer_name: 'Tanmay Sharma',
-    customer_email: 'tanmay@example.com',
-    total_amount: 1498,
-    status: 'PENDING',
-    payment_status: 'PAID',
-    items: [
-      { name: 'Oversized Raw Indigo Utility Work Shirt', sku: 'CUR-SH-001', size: 'XL', price: 1399 }
-    ],
-    created_at: '2026-10-18T10:15:00.000Z'
-  },
-  {
-    id: 'ord-1791130399149',
-    order_number: 'CUR-1002',
-    customer_name: 'Mayur Joshi',
-    customer_email: 'may@example.com',
-    total_amount: 2299,
-    status: 'PACKED',
-    payment_status: 'PAID',
-    items: [
-      { name: 'Vintage Acid Wash Heavy Denim Chore Jacket', sku: 'CUR-JK-001', size: 'L', price: 2299 }
-    ],
-    created_at: '2026-10-17T14:20:00.000Z'
-  },
-  {
-    id: 'ord-1791048209402',
-    order_number: 'CUR-1001',
-    customer_name: 'Tanmay Khurpe',
-    customer_email: 'khurpetanmay53@gmail.com',
-    total_amount: 1698,
-    status: 'PACKED',
-    payment_status: 'PAID',
-    items: [
-      { name: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie', sku: 'CUR-HD-001', size: 'L', price: 1599 }
-    ],
-    created_at: '2026-10-16T18:45:00.000Z'
-  }
-];
-
-// Fallback activity ledger
-const SEED_ACTIVITY_LOGS = [
-  {
-    id: 'tx-1791130411180',
-    sku: 'CUR-JK-001',
-    product_name: 'Vintage Acid Wash Heavy Denim Chore Jacket',
-    quantity_change: -1,
-    reason: 'Online Sale',
-    admin_user: 'SYSTEM',
-    order_id: 'ord-1791130399149',
-    note: 'Online purchase verified & stock reserved',
-    created_at: '2026-10-17T14:21:00.000Z'
-  },
-  {
-    id: 'tx-1791048209420',
-    sku: 'CUR-HD-001',
-    product_name: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie',
-    quantity_change: -1,
-    reason: 'Online Sale',
-    admin_user: 'SYSTEM',
-    order_id: 'ord-1791048209402',
-    note: 'Online purchase verified & stock reserved',
-    created_at: '2026-10-16T18:46:00.000Z'
-  },
-  {
-    id: 'tx-001',
-    sku: 'CUR-TS-001',
-    product_name: 'Heavyweight Washed Vintage Boxy Tee',
-    quantity_change: 1,
-    reason: 'Initial Stock Added',
-    admin_user: 'Nikhil Pol',
-    order_id: null,
-    note: 'Initial drop catalog entry created',
-    created_at: '2026-10-15T10:00:00.000Z'
-  },
-  {
-    id: 'tx-003',
-    sku: 'CUR-SH-001',
-    product_name: 'Oversized Minimalist Utility Work Shirt',
-    quantity_change: 1,
-    reason: 'Initial Stock Added',
-    admin_user: 'Nikhil Pol',
-    order_id: null,
-    note: 'Initial drop catalog entry created',
-    created_at: '2026-10-15T11:00:00.000Z'
-  }
-];
 
 export default function NikhilAdminDashboard({ onExit }) {
   // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'settings' | 'activity'
@@ -289,35 +199,17 @@ export default function NikhilAdminDashboard({ onExit }) {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         setOrders(data);
       } else {
-        try {
-          const apiRes = await fetch('/api/orders');
-          const apiData = await apiRes.json();
-          if (apiData && apiData.success && Array.isArray(apiData.orders) && apiData.orders.length > 0) {
-            const mapped = apiData.orders.map((o) => ({
-              id: o.id,
-              order_number: o.order_number || o.id,
-              customer_name: o.customer?.name || o.customer_name || 'Customer',
-              customer_email: o.customer?.email || o.customer_email || 'customer@example.com',
-              total_amount: parseFloat(o.total || o.total_amount || 0),
-              status: (o.status || (o.order_status === 'CONFIRMED' ? 'PACKED' : 'PENDING')).toUpperCase(),
-              payment_status: o.payment_status || 'PAID',
-              items: o.items || [],
-              created_at: o.created_at || new Date().toISOString()
-            }));
-            setOrders(mapped);
-          } else {
-            setOrders(SEED_FALLBACK_ORDERS);
-          }
-        } catch {
-          setOrders(SEED_FALLBACK_ORDERS);
+        if (error) {
+          console.error('Error fetching orders from Supabase:', error);
         }
+        setOrders([]);
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
-      setOrders(SEED_FALLBACK_ORDERS);
+      setOrders([]);
     } finally {
       setLoadingOrders(false);
     }
@@ -332,18 +224,18 @@ export default function NikhilAdminDashboard({ onExit }) {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         setProducts(data);
       } else {
-        const apiRes = await fetch('/api/products?is_admin=true');
-        const apiData = await apiRes.json();
-        if (apiData && apiData.success && Array.isArray(apiData.products)) {
-          setProducts(apiData.products);
+        if (error) {
+          console.error('Error fetching catalog from Supabase:', error);
         }
+        setProducts([]);
       }
     } catch (err) {
       console.error('Error fetching catalog:', err);
       setActionError('Could not load products. Please check Supabase table configuration.');
+      setProducts([]);
     } finally {
       setLoadingProducts(false);
     }
@@ -357,24 +249,17 @@ export default function NikhilAdminDashboard({ onExit }) {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         setActivityLogs(data);
       } else {
-        try {
-          const apiRes = await fetch('/api/inventory-transactions');
-          const apiData = await apiRes.json();
-          if (apiData && apiData.success && Array.isArray(apiData.transactions) && apiData.transactions.length > 0) {
-            setActivityLogs(apiData.transactions);
-          } else {
-            setActivityLogs(SEED_ACTIVITY_LOGS);
-          }
-        } catch {
-          setActivityLogs(SEED_ACTIVITY_LOGS);
+        if (error) {
+          console.error('Error fetching activity logs from Supabase:', error);
         }
+        setActivityLogs([]);
       }
     } catch (err) {
       console.error('Error fetching activity logs:', err);
-      setActivityLogs(SEED_ACTIVITY_LOGS);
+      setActivityLogs([]);
     } finally {
       setLoadingLogs(false);
     }
@@ -2153,7 +2038,9 @@ export default function NikhilAdminDashboard({ onExit }) {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {products.map((item) => {
-                    const img = Array.isArray(item.images) ? item.images[0] : (item.images || '/products/man_street_hoodie.jpg');
+                    const img = Array.isArray(item.images)
+                      ? (item.images[0] || item.image_url)
+                      : (item.images || item.image_url || '');
                     const price = item.selling_price || 0;
 
                     return (
@@ -2171,18 +2058,36 @@ export default function NikhilAdminDashboard({ onExit }) {
                         }}
                       >
                         {/* Thumbnail on left */}
-                        <img
-                          src={img}
-                          alt={item.name}
-                          style={{
-                            width: '56px',
-                            height: '70px',
-                            objectFit: 'cover',
-                            borderRadius: '4px',
-                            backgroundColor: '#F4F4F5',
-                            flexShrink: 0
-                          }}
-                        />
+                        {img ? (
+                          <img
+                            src={img}
+                            alt={item.name}
+                            style={{
+                              width: '56px',
+                              height: '70px',
+                              objectFit: 'cover',
+                              borderRadius: '4px',
+                              backgroundColor: '#F4F4F5',
+                              flexShrink: 0
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '56px',
+                              height: '70px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              backgroundColor: '#F4F4F5',
+                              color: '#A1A1AA',
+                              flexShrink: 0
+                            }}
+                          >
+                            <Package size={20} />
+                          </div>
+                        )}
 
                         {/* Title & Price in middle */}
                         <div style={{ flex: 1, minWidth: 0 }}>
