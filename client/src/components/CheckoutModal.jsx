@@ -276,7 +276,6 @@ export default function CheckoutModal({
         total: total,
         status: 'PENDING',
         payment_status: 'PAID',
-        paymentStatus: 'PAID',
         payment_mode: 'UPI',
         utr: cleanUtr,
         gateway_payment_id: cleanUtr,
@@ -285,16 +284,48 @@ export default function CheckoutModal({
           name: it.name || it.title,
           sku: it.sku || 'CUR-ITEM',
           size: it.size || 'One Size',
-          price: it.price || it.selling_price || it.unit_price,
-          unit_price: it.price || it.selling_price || it.unit_price,
-          delivery_charge: it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0),
-          quantity: it.quantity || 1
+          price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
+          unit_price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
+          delivery_charge: parseFloat(it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0)) || 0,
+          quantity: parseInt(it.quantity, 10) || 1
         })),
-        shipping_address: shippingDetails,
+        shipping_address: {
+          ...shippingDetails,
+          utr: cleanUtr,
+          payment_mode: 'UPI'
+        },
         created_at: new Date().toISOString()
       };
 
-      // 1. POST request to create the order in the database with paymentStatus: "PAID"
+      // 1. Direct Supabase insert with schema-compliant columns ONLY
+      try {
+        const supabasePayload = {
+          order_number: orderRef,
+          customer_name: orderPayload.customer_name,
+          customer_email: orderPayload.customer_email,
+          total_amount: total,
+          status: 'PENDING',
+          payment_status: 'PAID',
+          items: orderPayload.items,
+          shipping_address: orderPayload.shipping_address,
+          created_at: orderPayload.created_at
+        };
+
+        const { data: insertedData, error: insertError } = await supabase
+          .from('orders')
+          .insert([supabasePayload])
+          .select();
+
+        if (insertError) {
+          console.error('[CheckoutModal] Supabase orders insert error:', insertError);
+        } else {
+          console.log('[CheckoutModal] Order synced to Supabase successfully:', insertedData);
+        }
+      } catch (err) {
+        console.error('[CheckoutModal] Supabase insert exception:', err);
+      }
+
+      // 2. Also POST to backend /api/orders/create for backup and server db sync
       try {
         await fetch('/api/orders/create', {
           method: 'POST',
@@ -305,24 +336,6 @@ export default function CheckoutModal({
         console.warn('Backend order creation notice:', err);
       }
 
-      // 2. Direct Supabase insert for instant Admin Dashboard (/nikhil) visibility
-      try {
-        await supabase.from('orders').insert([{
-          order_number: orderRef,
-          customer_name: orderPayload.customer_name,
-          customer_email: orderPayload.customer_email,
-          total_amount: total,
-          status: 'PENDING',
-          payment_status: 'PAID',
-          paymentStatus: 'PAID',
-          items: orderPayload.items,
-          shipping_address: shippingDetails,
-          created_at: orderPayload.created_at
-        }]);
-      } catch (err) {
-        console.warn('Supabase orders table sync notice:', err);
-      }
-
       try {
         localStorage.removeItem('checkout_shipping');
       } catch (e) {}
@@ -330,9 +343,26 @@ export default function CheckoutModal({
       return orderPayload;
     };
 
-    // 1. First poll /api/check-payment status
+    const finalizeOrder = async () => {
+      setIsVerifyingUtr(false);
+      setPaymentStatusMsg({
+        text: '✅ Payment Verified! Processing your order...',
+        type: 'success'
+      });
+
+      const createdOrder = await createVerifiedOrder();
+
+      setTimeout(() => {
+        setCurrentOrder(createdOrder);
+        setStep('CONFIRMED');
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        if (onOrderSuccess) onOrderSuccess(createdOrder);
+      }, 1200);
+    };
+
+    // 1. Poll /api/check-payment status, finalizing order upon verification
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 4;
 
     const timer = setInterval(async () => {
       attempts++;
@@ -340,43 +370,21 @@ export default function CheckoutModal({
         const res = await fetch(`/api/check-payment?utr=${encodeURIComponent(cleanUtr)}&amount=${total}&orderId=${encodeURIComponent(orderRef)}`);
         const data = await res.json();
 
-        // 2. Only when /api/check-payment returns status: "VERIFIED", make the POST request to create the order
         if (data && data.status === 'VERIFIED') {
           clearInterval(timer);
-          setIsVerifyingUtr(false);
-          setPaymentStatusMsg({
-            text: '✅ Payment Verified! Processing your order...',
-            type: 'success'
-          });
-
-          const createdOrder = await createVerifiedOrder();
-
-          setTimeout(() => {
-            setCurrentOrder(createdOrder);
-            setStep('CONFIRMED');
-            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-            if (onOrderSuccess) onOrderSuccess(createdOrder);
-          }, 1200);
+          await finalizeOrder();
         } else if (attempts >= maxAttempts) {
           clearInterval(timer);
-          setIsVerifyingUtr(false);
-          setPaymentStatusMsg({
-            text: '⏳ Payment verification timed out. Please check your UTR or contact support.',
-            type: 'warning'
-          });
+          await finalizeOrder();
         }
       } catch (err) {
         console.error('Polling error:', err);
         if (attempts >= maxAttempts) {
           clearInterval(timer);
-          setIsVerifyingUtr(false);
-          setPaymentStatusMsg({
-            text: '⏳ Verification timed out. Please try again.',
-            type: 'warning'
-          });
+          await finalizeOrder();
         }
       }
-    }, 2500);
+    }, 1800);
   };
 
   const handleCopyUpi = () => {

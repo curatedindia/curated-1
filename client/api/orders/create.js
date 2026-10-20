@@ -76,7 +76,6 @@ export default async function handler(req, res) {
       total_amount: finalTotal,
       status: 'PENDING',
       payment_status: finalPaymentStatus,
-      paymentStatus: finalPaymentStatus,
       items: items || [],
       shipping_address: shipping_address || customer || {},
       created_at: new Date().toISOString()
@@ -88,9 +87,12 @@ export default async function handler(req, res) {
     if (supabaseUrl && supabaseKey) {
       try {
         const supabase = createClient(supabaseUrl, supabaseKey);
-        await supabase.from('orders').insert([orderRecord]);
+        const { error: insErr } = await supabase.from('orders').upsert([orderRecord], { onConflict: 'order_number' });
+        if (insErr) {
+          console.warn('[Create Order Supabase Insert Warning]:', insErr.message);
+        }
       } catch (dbErr) {
-        console.warn('[Create Order Supabase Insert Warning]:', dbErr.message);
+        console.warn('[Create Order Supabase Insert Exception]:', dbErr.message);
       }
     }
 

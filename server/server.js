@@ -804,7 +804,95 @@ app.get(['/api/check-payment', '/check-payment'], (req, res) => {
     }
   }
 
+  // When customer enters a valid 12-digit numeric UTR, verify payment
+  if (cleanUtr && /^\d{12}$/.test(cleanUtr)) {
+    return res.json({ status: 'VERIFIED' });
+  }
+
   return res.json({ status: 'PENDING' });
+});
+
+// 3. CREATE ORDER: Triggered when payment is verified
+app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
+  try {
+    const {
+      order_number,
+      customer_name,
+      customer_email,
+      customer,
+      total_amount,
+      total,
+      payment_status,
+      items,
+      shipping_address,
+      utr
+    } = req.body || {};
+
+    const finalOrderNumber = order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalTotal = Number(total_amount || total || 0);
+    const finalPaymentStatus = payment_status || 'PAID';
+
+    const newOrder = {
+      id: `ord-${Date.now()}`,
+      order_number: finalOrderNumber,
+      customer_name: customer_name || customer?.name || 'Customer',
+      customer_email: customer_email || customer?.email || 'customer@example.com',
+      customer: customer || shipping_address || {},
+      total_amount: finalTotal,
+      total: finalTotal,
+      status: 'PENDING',
+      order_status: 'CONFIRMED',
+      payment_status: finalPaymentStatus,
+      payment_mode: 'UPI',
+      utr: utr || null,
+      items: items || [],
+      shipping_address: shipping_address || customer || {},
+      created_at: new Date().toISOString()
+    };
+
+    // 1. Add to local db if not existing
+    const existing = db.data.orders.find((o) => o.order_number === finalOrderNumber);
+    if (!existing) {
+      db.data.orders.unshift(newOrder);
+      db.save();
+    }
+
+    // 2. Also ensure inserted into Supabase
+    try {
+      const supabasePayload = {
+        order_number: finalOrderNumber,
+        customer_name: newOrder.customer_name,
+        customer_email: newOrder.customer_email,
+        total_amount: finalTotal,
+        status: 'PENDING',
+        payment_status: finalPaymentStatus,
+        items: newOrder.items,
+        shipping_address: newOrder.shipping_address,
+        created_at: newOrder.created_at
+      };
+
+      if (supabase) {
+        const { error: sbErr } = await supabase
+          .from('orders')
+          .upsert([supabasePayload], { onConflict: 'order_number' });
+        if (sbErr) console.warn('[Server Orders Supabase Sync Warning]:', sbErr.message);
+      }
+    } catch (err) {
+      console.warn('[Server Orders Supabase Sync Error]:', err.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Order created with verified payment',
+      order: newOrder
+    });
+  } catch (err) {
+    console.error('[Create Order Server Error]:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Error creating order.'
+    });
+  }
 });
 
 // Track Order Lookup (SF-33)

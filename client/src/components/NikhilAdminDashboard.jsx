@@ -156,9 +156,24 @@ export default function NikhilAdminDashboard({ onExit }) {
       }
     });
 
+    // Realtime listener for instant order synchronization
+    const ordersChannel = supabase
+      .channel('admin-orders-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          if (isMounted) {
+            fetchOrders();
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
       authListener?.subscription?.unsubscribe();
+      ordersChannel?.unsubscribe();
     };
   }, []);
 
