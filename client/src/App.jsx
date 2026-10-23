@@ -13,6 +13,7 @@ import SoldOutView from './components/SoldOutView';
 import AboutView from './components/AboutView';
 import ContactView from './components/ContactView';
 import PolicyModal from './components/PolicyModal';
+import OrdersView from './components/OrdersView';
 import AdminPanel from './components/AdminPanel';
 import NikhilAdminDashboard from './components/NikhilAdminDashboard';
 import StayTunedSection from './components/StayTunedSection';
@@ -115,13 +116,21 @@ export default function App() {
 
   // Authenticated user via Supabase Google OAuth
   const [authUser, setAuthUser] = useState(null);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem('curated_last_order');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Sync cart items to localStorage whenever updated
   useEffect(() => {
     localStorage.setItem('curated_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // Handle URL routing for /checkout, /nikhil, and Supabase Google OAuth callback
+  // Handle URL routing for /checkout, /nikhil, /orders, and Supabase Google OAuth callback
   useEffect(() => {
     const handleLocationChange = () => {
       const pathname = window.location.pathname.replace(/\/+$/, '');
@@ -131,6 +140,9 @@ export default function App() {
       // Automatically navigate to dedicated admin dashboard if user lands on /nikhil
       if (pathname === '/nikhil') {
         setCurrentView('nikhil');
+        setCheckoutModalOpen(false);
+      } else if (pathname === '/orders') {
+        setCurrentView('orders');
         setCheckoutModalOpen(false);
       } else if (pathname === '/checkout' || hash.includes('access_token') || search.includes('code=')) {
         setCurrentView('checkout');
@@ -314,9 +326,50 @@ export default function App() {
     setCartItems((prev) => prev.filter((it) => it.variant_id !== variantId));
   };
 
-  const handleOrderSuccess = () => {
+  const handleOrderSuccess = (order) => {
     setCartItems([]);
+    if (order) {
+      setLastPlacedOrder(order);
+      try {
+        localStorage.setItem('curated_last_order', JSON.stringify(order));
+        if (order.customer_email) localStorage.setItem('curated_customer_email', order.customer_email);
+        if (order.customer_name) localStorage.setItem('curated_customer_name', order.customer_name);
+      } catch (e) {}
+    }
     fetchProductsAndSettings();
+    setCheckoutModalOpen(false);
+    setCurrentView('orders');
+    if (window.location.pathname === '/checkout') {
+      window.history.pushState({}, '', '/orders');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    setAuthUser(null);
+    try {
+      localStorage.removeItem('curated_customer_email');
+      localStorage.removeItem('curated_customer_name');
+    } catch (e) {}
+    setCurrentView('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    setAuthUser(null);
+    try {
+      localStorage.clear();
+    } catch (e) {}
+    setCartItems([]);
+    setCurrentView('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alert('Your Curated account data and local session have been successfully removed.');
   };
 
   // Filtered views
@@ -355,6 +408,13 @@ export default function App() {
           soldOutEnabled={settings?.sold_out_section_enabled}
           isAdmin={false}
           setIsAdmin={() => setCurrentView('admin')}
+          user={authUser}
+          onNavigateToOrders={() => {
+            setCurrentView('orders');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
         />
       )}
 
@@ -939,6 +999,21 @@ export default function App() {
         )}
 
         {/* ========================================================
+            VIEW: MY ORDERS & DELIVERY STATUS
+        ======================================================== */}
+        {currentView === 'orders' && (
+          <OrdersView
+            user={authUser}
+            customerEmail={lastPlacedOrder?.customer_email}
+            highlightOrderNumber={lastPlacedOrder?.order_number}
+            onBackToShop={() => {
+              setCurrentView('shop');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* ========================================================
             VIEW: TRACK ORDER (SF-33)
         ======================================================== */}
         {currentView === 'track-order' && <TrackOrderView />}
@@ -964,8 +1039,8 @@ export default function App() {
               setCurrentView('shop');
               window.history.pushState({}, '', '/');
             }}
-            onOrderPlaced={() => {
-              handleOrderSuccess();
+            onOrderPlaced={(order) => {
+              handleOrderSuccess(order);
             }}
             settings={settings}
           />

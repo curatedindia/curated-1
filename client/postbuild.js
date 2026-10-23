@@ -25,7 +25,15 @@ if (fs.existsSync(indexPath)) {
   fs.copyFileSync(indexPath, path.join(nikhilDir, 'index.html'));
   fs.copyFileSync(indexPath, path.join(distDir, 'nikhil.html'));
 
-  // 3. Create dist/404.html so Vercel automatically serves the SPA on any unhandled route
+  // 3. Create dist/orders/index.html so /orders is a physical static directory/file on Vercel
+  const ordersDir = path.join(distDir, 'orders');
+  if (!fs.existsSync(ordersDir)) {
+    fs.mkdirSync(ordersDir, { recursive: true });
+  }
+  fs.copyFileSync(indexPath, path.join(ordersDir, 'index.html'));
+  fs.copyFileSync(indexPath, path.join(distDir, 'orders.html'));
+
+  // 4. Create dist/404.html so Vercel automatically serves the SPA on any unhandled route
   fs.copyFileSync(indexPath, path.join(distDir, '404.html'));
 
   // 4. Sync client/dist to root /dist for universal Vercel output detection

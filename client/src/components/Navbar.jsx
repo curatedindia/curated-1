@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingBag, Search, Menu, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, ArrowRight, ShieldCheck, User } from 'lucide-react';
+import ProfileMenu from './ProfileMenu';
 
 export default function Navbar({
   currentView,
@@ -10,7 +11,11 @@ export default function Navbar({
   onOpenSearch,
   soldOutEnabled,
   isAdmin,
-  setIsAdmin
+  setIsAdmin,
+  user,
+  onNavigateToOrders,
+  onLogout,
+  onDeleteAccount
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -21,6 +26,7 @@ export default function Navbar({
     { id: 'new-drops', label: 'NEW DROPS' },
     { id: 'sold-out', label: 'SOLD OUT' },
     { id: 'about', label: 'ABOUT US' },
+    { id: 'orders', label: 'MY ORDERS' },
     { id: 'track-order', label: 'TRACK ORDER' },
     { id: 'contact', label: 'CONTACT' },
   ];
@@ -170,6 +176,18 @@ export default function Navbar({
                 {cartCount}
               </span>
             </button>
+
+            {/* Profile Menu Trigger (Right Corner) */}
+            <ProfileMenu
+              user={user}
+              onNavigateToOrders={() => {
+                if (onNavigateToOrders) onNavigateToOrders();
+                else handleNavClick('orders');
+              }}
+              onNavigateToTrack={() => handleNavClick('track-order')}
+              onLogout={onLogout}
+              onDeleteAccount={onDeleteAccount}
+            />
           </div>
         </div>
       </header>

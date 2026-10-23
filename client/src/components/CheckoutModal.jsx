@@ -338,6 +338,13 @@ export default function CheckoutModal({
 
       try {
         localStorage.removeItem('checkout_shipping');
+        localStorage.setItem('curated_last_order', JSON.stringify(orderPayload));
+        if (orderPayload.customer_email) {
+          localStorage.setItem('curated_customer_email', orderPayload.customer_email);
+        }
+        if (orderPayload.customer_name) {
+          localStorage.setItem('curated_customer_name', orderPayload.customer_name);
+        }
       } catch (e) {}
 
       return orderPayload;
@@ -356,7 +363,10 @@ export default function CheckoutModal({
         setCurrentOrder(createdOrder);
         setStep('CONFIRMED');
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-        if (onOrderSuccess) onOrderSuccess(createdOrder);
+
+        setTimeout(() => {
+          if (onOrderSuccess) onOrderSuccess(createdOrder);
+        }, 2400);
       }, 1200);
     };
 
@@ -913,9 +923,29 @@ export default function CheckoutModal({
             </div>
 
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (onOrderSuccess) onOrderSuccess(currentOrder);
+                onClose();
+              }}
               className="btn btn-primary"
-              style={{ width: '100%', height: '48px' }}
+              style={{ width: '100%', height: '50px', fontSize: '13.5px', fontWeight: 800, marginBottom: '10px' }}
+            >
+              VIEW ORDER &amp; ESTIMATED DELIVERY DATE →
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: '100%',
+                height: '42px',
+                background: 'none',
+                border: '1px solid #E4E4E7',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#71717A',
+                cursor: 'pointer'
+              }}
             >
               RETURN TO STORE
             </button>
