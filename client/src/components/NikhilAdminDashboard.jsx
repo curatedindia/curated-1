@@ -112,7 +112,6 @@ export default function NikhilAdminDashboard({ onExit }) {
     }, 0);
   }, []);
 
-  // Timeframe switch handler
   const handleTimeframeChange = (newTf) => {
     setRevenueTimeframe(newTf);
     setRevenue(calculateRevenue(orders, newTf));
@@ -353,7 +352,6 @@ export default function NikhilAdminDashboard({ onExit }) {
     } catch (err) {
       console.error('Failed to update order status in Supabase:', err);
       setActionError('Failed to update order status. Reverting changes.');
-      // Revert local state
       const reverted = orders.map((o) =>
         o.id === order.id ? { ...o, status: order.status } : o
       );
@@ -370,7 +368,6 @@ export default function NikhilAdminDashboard({ onExit }) {
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // JavaScript validation to block files over 50MB before uploading
       if (file.size > 50 * 1024 * 1024) {
         alert('File size exceeds the 50MB limit. Please select an image under 50MB.');
         e.target.value = '';
@@ -417,7 +414,6 @@ export default function NikhilAdminDashboard({ onExit }) {
       const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const storagePath = `products/${cleanFileName}`;
 
-      // 1. Upload to Supabase product-images storage bucket
       const { error: uploadError } = await supabase.storage
         .from('product-images')
         .upload(storagePath, imageFile, {
@@ -429,7 +425,6 @@ export default function NikhilAdminDashboard({ onExit }) {
         throw new Error(`Storage upload failed: ${uploadError.message}`);
       }
 
-      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('product-images')
         .getPublicUrl(storagePath);
@@ -469,7 +464,6 @@ export default function NikhilAdminDashboard({ onExit }) {
         created_at: new Date().toISOString()
       };
 
-      // 3. Insert row into products table
       const { error: insertError } = await supabase
         .from('products')
         .insert([newProductPayload]);
@@ -481,7 +475,6 @@ export default function NikhilAdminDashboard({ onExit }) {
       setSuccessMessage(`✓ '${productForm.title}' published successfully!`);
       setTimeout(() => setSuccessMessage(''), 4000);
 
-      // Reset Form
       setProductForm({
         title: '',
         category: 't-shirts',
@@ -499,7 +492,6 @@ export default function NikhilAdminDashboard({ onExit }) {
       setImagePreview('');
       if (fileInputRef.current) fileInputRef.current.value = '';
 
-      // Refresh catalog from Supabase
       fetchCatalog();
     } catch (err) {
       console.error('Error adding product:', err);
@@ -605,7 +597,7 @@ export default function NikhilAdminDashboard({ onExit }) {
   if (authChecking) {
     return (
       <div className="min-h-screen w-full bg-[#121212] text-white flex flex-col items-center justify-center p-6">
-        <div className="w-10 h-10 border-3 border-zinc-700 border-t-white rounded-full animate-spin mb-4" />
+        <div className="w-9 h-9 border-2 border-zinc-700 border-t-white rounded-full animate-spin mb-4" />
         <p className="font-mono text-xs uppercase tracking-widest text-zinc-400">
           Verifying Admin Credentials...
         </p>
@@ -619,11 +611,11 @@ export default function NikhilAdminDashboard({ onExit }) {
   if (!currentUser) {
     return (
       <div className="min-h-screen w-full bg-[#09090B] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-[#121212] border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl text-center">
-          <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-            <Lock size={22} className="text-white" />
+        <div className="w-full max-w-sm bg-[#121212] border border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xl text-center">
+          <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <Lock size={20} className="text-white" />
           </div>
-          <h1 className="font-extrabold text-lg tracking-wider text-white uppercase">
+          <h1 className="font-extrabold text-base sm:text-lg tracking-wider text-white uppercase font-mono">
             CURATED // ADMIN
           </h1>
           <p className="text-xs text-zinc-400 mt-1 mb-6">
@@ -631,8 +623,8 @@ export default function NikhilAdminDashboard({ onExit }) {
           </p>
 
           {authError && (
-            <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-lg text-red-400 text-xs mb-4 flex items-center gap-2">
-              <AlertTriangle size={16} className="shrink-0" />
+            <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-red-400 text-xs mb-4 flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0" />
               <span>{authError}</span>
             </div>
           )}
@@ -640,13 +632,13 @@ export default function NikhilAdminDashboard({ onExit }) {
           <button
             onClick={handleAdminGoogleLogin}
             disabled={isSigningIn}
-            className="w-full min-h-[48px] bg-white text-zinc-900 font-bold text-sm tracking-wide rounded-lg flex items-center justify-center gap-3 cursor-pointer hover:bg-zinc-100 transition-colors disabled:opacity-60"
+            className="w-full min-h-[48px] bg-white text-zinc-900 font-bold text-xs tracking-wider rounded-xl flex items-center justify-center gap-3 cursor-pointer hover:bg-zinc-100 transition-colors disabled:opacity-60 uppercase"
           >
             {isSigningIn ? (
               <span>VERIFYING...</span>
             ) : (
               <>
-                <svg width="20" height="20" viewBox="0 0 24 24">
+                <svg width="18" height="18" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
@@ -666,16 +658,16 @@ export default function NikhilAdminDashboard({ onExit }) {
   // Fixed Bottom Bar with 4 tabs: Dashboard, Orders, Catalog, Drop Alerts
   // ========================================================
   return (
-    <div className="min-h-screen w-full bg-[#F8F9FA] text-[#121212] relative overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#F8F9FA] text-[#121212] relative overflow-x-hidden antialiased">
       
       {/* 1. Mobile Top Header */}
-      <header className="sticky top-0 z-40 bg-[#121212] text-white border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-[#121212]/95 backdrop-blur-md text-white border-b border-zinc-800/80 px-4 py-3">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-sm sm:text-base tracking-wider uppercase">
+            <span className="font-extrabold text-sm tracking-wider uppercase font-mono">
               NIKHIL ADMIN
             </span>
-            <span className="bg-zinc-900 border border-zinc-700 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+            <span className="bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
               <ShieldCheck size={11} className="text-emerald-400" /> SECURE
             </span>
           </div>
@@ -686,7 +678,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 if (onExit) onExit();
                 else window.location.href = '/';
               }}
-              className="bg-transparent border border-zinc-700 hover:border-zinc-500 text-white rounded px-2.5 py-1 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 text-white rounded-lg px-2.5 py-1 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <ExternalLink size={12} />
               <span>SHOP</span>
@@ -695,7 +687,7 @@ export default function NikhilAdminDashboard({ onExit }) {
             <button
               onClick={handleAdminLogout}
               title="Sign Out"
-              className="bg-red-600 hover:bg-red-700 text-white rounded p-1.5 text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
+              className="bg-red-600/90 hover:bg-red-600 text-white rounded-lg p-1.5 text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
             >
               <LogOut size={13} />
             </button>
@@ -704,19 +696,24 @@ export default function NikhilAdminDashboard({ onExit }) {
       </header>
 
       {/* 2. Main Tab Content Container */}
-      <main className="w-full max-w-2xl mx-auto px-3.5 py-4 pb-28">
+      <main
+        className="w-full max-w-2xl mx-auto px-4 py-4"
+        style={{
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 16px))'
+        }}
+      >
         
         {/* Global Notifications */}
         {actionError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-semibold mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} className="shrink-0 text-red-600" />
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold mb-3 flex items-center gap-2 shadow-xs">
+            <AlertTriangle size={15} className="shrink-0 text-red-600" />
             <span>{actionError}</span>
           </div>
         )}
 
         {successMessage && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold mb-3 flex items-center gap-2">
-            <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold mb-3 flex items-center gap-2 shadow-xs">
+            <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
             <span>{successMessage}</span>
           </div>
         )}
@@ -728,14 +725,14 @@ export default function NikhilAdminDashboard({ onExit }) {
           <div className="flex flex-col gap-4">
             
             {/* Header & Timeframe Filter */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-base sm:text-lg font-extrabold uppercase tracking-wide">
+                  <h1 className="text-base font-extrabold uppercase tracking-wide">
                     REAL-TIME OVERVIEW
                   </h1>
-                  <p className="text-xs text-zinc-500">
-                    Supabase live data • {REQUIRED_ADMIN_EMAIL}
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Live Supabase Metrics • {REQUIRED_ADMIN_EMAIL}
                   </p>
                 </div>
 
@@ -744,28 +741,28 @@ export default function NikhilAdminDashboard({ onExit }) {
                     fetchOrders();
                     fetchCatalog();
                   }}
-                  className="p-1.5 bg-white border border-zinc-300 rounded text-xs font-bold flex items-center gap-1 hover:bg-zinc-50 cursor-pointer"
+                  className="px-2.5 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
                   title="Refresh metrics"
                 >
-                  <RefreshCw size={13} className={loadingOrders || loadingProducts ? 'animate-spin' : ''} />
+                  <RefreshCw size={12} className={loadingOrders || loadingProducts ? 'animate-spin' : ''} />
                   <span>REFRESH</span>
                 </button>
               </div>
 
-              {/* Timeframe Selector Pills */}
-              <div className="grid grid-cols-4 bg-zinc-200/80 p-1 rounded-lg gap-1">
+              {/* Native Clean Segmented Control */}
+              <div className="grid grid-cols-4 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1">
                 {[
                   { id: 'day', label: 'Day' },
                   { id: 'month', label: 'Month' },
                   { id: 'year', label: 'Year' },
-                  { id: 'all', label: 'All Time' }
+                  { id: 'all', label: 'All' }
                 ].map((tf) => (
                   <button
                     key={tf.id}
                     onClick={() => handleTimeframeChange(tf.id)}
-                    className={`py-1.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                    className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
                       revenueTimeframe === tf.id
-                        ? 'bg-[#121212] text-white shadow-sm'
+                        ? 'bg-[#121212] text-white shadow-xs'
                         : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                     }`}
                   >
@@ -776,18 +773,20 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* Total Revenue Display Card */}
-            <div className="bg-[#121212] text-white rounded-xl p-5 shadow-lg border border-zinc-800">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-extrabold tracking-wider text-zinc-400 uppercase">
+            <div className="bg-[#121212] text-white rounded-2xl p-5 shadow-sm border border-zinc-800 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
                   REVENUE ({revenueTimeframe.toUpperCase()})
                 </span>
-                <TrendingUp size={18} className="text-emerald-400" />
+                <div className="w-7 h-7 rounded-full bg-emerald-950/80 border border-emerald-800 flex items-center justify-center">
+                  <TrendingUp size={14} className="text-emerald-400" />
+                </div>
               </div>
               <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                 ₹{revenue.toLocaleString('en-IN')}
               </div>
               <p className="text-xs text-zinc-400 mt-2">
-                Calculated dynamically from {orders.length} orders in Supabase
+                Calculated dynamically from {orders.length} orders
               </p>
             </div>
 
@@ -800,18 +799,18 @@ export default function NikhilAdminDashboard({ onExit }) {
                   setActiveTab('orders');
                   setOrderStatusFilter('PACKED');
                 }}
-                className="bg-white border border-zinc-200 rounded-xl p-4 shadow-xs cursor-pointer hover:border-emerald-300 transition-colors"
+                className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-emerald-300 transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                     PACKED
                   </span>
                   <CheckCircle2 size={16} className="text-emerald-600" />
                 </div>
-                <div className="text-3xl font-black text-emerald-600">
+                <div className="text-2xl sm:text-3xl font-black text-emerald-600">
                   {packedCount}
                 </div>
-                <span className="text-[11px] font-bold text-zinc-400 mt-1 block">
+                <span className="text-[11px] font-semibold text-zinc-400 mt-1 block">
                   Orders ready →
                 </span>
               </div>
@@ -822,24 +821,24 @@ export default function NikhilAdminDashboard({ onExit }) {
                   setActiveTab('orders');
                   setOrderStatusFilter('PENDING');
                 }}
-                className={`bg-white rounded-xl p-4 shadow-xs cursor-pointer transition-colors ${
+                className={`bg-white rounded-2xl p-4 shadow-xs cursor-pointer transition-colors ${
                   pendingCount > 0
-                    ? 'border border-red-300 hover:border-red-400 bg-red-50/20'
+                    ? 'border border-red-300 hover:border-red-400 bg-red-50/15'
                     : 'border border-zinc-200 hover:border-zinc-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs font-extrabold uppercase tracking-wider ${
+                  <span className={`text-[11px] font-bold uppercase tracking-wider ${
                     pendingCount > 0 ? 'text-red-600' : 'text-zinc-500'
                   }`}>
                     PENDING
                   </span>
                   <Clock size={16} className={pendingCount > 0 ? 'text-red-600' : 'text-zinc-400'} />
                 </div>
-                <div className={`text-3xl font-black ${pendingCount > 0 ? 'text-red-600' : 'text-zinc-900'}`}>
+                <div className={`text-2xl sm:text-3xl font-black ${pendingCount > 0 ? 'text-red-600' : 'text-zinc-900'}`}>
                   {pendingCount}
                 </div>
-                <span className={`text-[11px] font-bold mt-1 block ${
+                <span className={`text-[11px] font-semibold mt-1 block ${
                   pendingCount > 0 ? 'text-red-600' : 'text-zinc-400'
                 }`}>
                   Needs packing →
@@ -851,11 +850,11 @@ export default function NikhilAdminDashboard({ onExit }) {
             {/* Catalog Count Summary Card */}
             <div
               onClick={() => setActiveTab('catalog')}
-              className="bg-white border border-zinc-200 rounded-xl p-4 shadow-xs flex items-center justify-between cursor-pointer hover:border-zinc-400 transition-colors"
+              className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex items-center justify-between cursor-pointer hover:border-zinc-300 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-zinc-100 rounded-lg text-zinc-800">
-                  <Package size={20} />
+                <div className="p-2.5 bg-zinc-100 rounded-xl text-zinc-800">
+                  <Package size={18} />
                 </div>
                 <div>
                   <div className="text-sm font-black text-zinc-900">
@@ -870,10 +869,10 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-2 mt-1">
+            <div className="grid grid-cols-2 gap-2.5 mt-0.5">
               <button
                 onClick={() => setActiveTab('catalog')}
-                className="min-h-[46px] bg-[#121212] text-white rounded-lg text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors"
+                className="min-h-[46px] bg-[#121212] text-white rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors shadow-xs"
               >
                 <PlusCircle size={15} />
                 <span>ADD PRODUCT</span>
@@ -881,10 +880,10 @@ export default function NikhilAdminDashboard({ onExit }) {
 
               <button
                 onClick={() => setActiveTab('drop-alerts')}
-                className="min-h-[46px] bg-white border border-zinc-300 text-zinc-900 rounded-lg text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-50 transition-colors"
+                className="min-h-[46px] bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
               >
                 <Bell size={15} />
-                <span>SEND DROP ALERT</span>
+                <span>DROP ALERT</span>
               </button>
             </div>
 
@@ -900,45 +899,45 @@ export default function NikhilAdminDashboard({ onExit }) {
             {/* Header & Controls */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-base sm:text-lg font-extrabold uppercase tracking-wide">
+                <h1 className="text-base font-extrabold uppercase tracking-wide">
                   ORDERS ({orders.length})
                 </h1>
-                <p className="text-xs text-zinc-500">
-                  Tap card for receipt • Toggle switch for Packed status
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Tap card for receipt • Toggle switch to pack
                 </p>
               </div>
 
               <button
                 onClick={() => fetchOrders()}
                 disabled={loadingOrders}
-                className="px-3 py-1.5 bg-white border border-zinc-300 rounded text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-zinc-50"
+                className="px-2.5 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
               >
-                <RefreshCw size={13} className={loadingOrders ? 'animate-spin' : ''} />
+                <RefreshCw size={12} className={loadingOrders ? 'animate-spin' : ''} />
                 <span>REFRESH</span>
               </button>
             </div>
 
             {/* Search Input */}
             <div className="relative w-full">
-              <Search size={16} className="absolute left-3 top-3 text-zinc-400" />
+              <Search size={15} className="absolute left-3.5 top-3.5 text-zinc-400" />
               <input
                 type="text"
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
                 placeholder="Search orders by number, customer, email..."
-                className="w-full min-h-[42px] bg-white border border-zinc-300 rounded-lg pl-9 pr-3 text-base text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-800"
+                className="w-full min-h-[42px] bg-white border border-zinc-200 rounded-xl pl-9 pr-3 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-800 shadow-xs"
               />
             </div>
 
-            {/* Filter Pills */}
-            <div className="grid grid-cols-3 bg-zinc-200/80 p-1 rounded-lg gap-1">
+            {/* Segmented Filter Pills */}
+            <div className="grid grid-cols-3 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1">
               {['ALL', 'PENDING', 'PACKED'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setOrderStatusFilter(filter)}
-                  className={`py-1.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                  className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
                     orderStatusFilter === filter
-                      ? 'bg-[#121212] text-white shadow-sm'
+                      ? 'bg-[#121212] text-white shadow-xs'
                       : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                   }`}
                 >
@@ -950,15 +949,15 @@ export default function NikhilAdminDashboard({ onExit }) {
             {/* Stacked Mobile Order Cards */}
             {loadingOrders ? (
               <div className="py-12 text-center text-zinc-500 text-xs">
-                <Loader2 size={24} className="animate-spin mx-auto mb-2 text-zinc-600" />
+                <Loader2 size={22} className="animate-spin mx-auto mb-2 text-zinc-500" />
                 Loading orders from Supabase...
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="bg-white border border-zinc-200 rounded-xl p-8 text-center text-zinc-500">
-                <ShoppingBag size={32} className="mx-auto mb-2 text-zinc-300" />
-                <p className="font-bold text-sm text-zinc-900">No orders found</p>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Customer orders will appear here in real-time.
+              <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center text-zinc-500 shadow-xs">
+                <ShoppingBag size={28} className="mx-auto mb-2 text-zinc-300" />
+                <p className="font-bold text-sm text-zinc-900">No matching orders</p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Customer orders will appear here automatically.
                 </p>
               </div>
             ) : (
@@ -980,31 +979,31 @@ export default function NikhilAdminDashboard({ onExit }) {
                     <div
                       key={order.id}
                       onClick={() => setSelectedOrder(order)}
-                      className={`bg-white border rounded-xl p-4 shadow-xs flex flex-col gap-3 cursor-pointer hover:shadow-md transition-all ${
-                        isPacked ? 'border-emerald-300 bg-emerald-50/10' : 'border-zinc-200'
+                      className={`bg-white border rounded-2xl p-4 shadow-xs flex flex-col gap-3 cursor-pointer hover:border-zinc-300 transition-all ${
+                        isPacked ? 'border-emerald-200/80 bg-emerald-50/10' : 'border-zinc-200'
                       }`}
                     >
                       {/* Top Row: Order ID & Date */}
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold bg-zinc-100 text-zinc-800 px-2.5 py-1 rounded">
+                        <span className="font-mono text-xs font-bold bg-zinc-100 text-zinc-800 px-2 py-0.5 rounded-md">
                           #{order.order_number || order.id.slice(0, 8)}
                         </span>
-                        <span className="text-xs font-medium text-zinc-500">
+                        <span className="text-xs font-medium text-zinc-400">
                           {dateStr}
                         </span>
                       </div>
 
                       {/* Middle Row: Customer Details & Total */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           {itemImg ? (
                             <img
                               src={itemImg}
                               alt="Garment"
-                              className="w-12 h-14 object-cover rounded bg-zinc-100 shrink-0 border border-zinc-200"
+                              className="w-[52px] h-[64px] object-cover rounded-lg bg-zinc-100 shrink-0 border border-zinc-200 shadow-2xs"
                             />
                           ) : (
-                            <div className="w-12 h-14 rounded bg-zinc-100 flex items-center justify-center shrink-0 text-zinc-400 border border-zinc-200">
+                            <div className="w-[52px] h-[64px] rounded-lg bg-zinc-100 flex items-center justify-center shrink-0 text-zinc-400 border border-zinc-200">
                               <Package size={18} />
                             </div>
                           )}
@@ -1014,7 +1013,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                               {order.customer_name || 'Customer'}
                             </div>
                             <div className="text-xs text-zinc-500 truncate mt-0.5">
-                              {order.customer_email || 'No email'}
+                              {order.customer_email || 'No email provided'}
                             </div>
                             {firstItem?.name && (
                               <div className="text-[11px] text-zinc-600 truncate mt-1">
@@ -1028,7 +1027,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                           <div className="font-black text-base text-zinc-900">
                             ₹{(parseFloat(order.total_amount) || 0).toLocaleString('en-IN')}
                           </div>
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                             {order.payment_status || 'PAID'}
                           </span>
                         </div>
@@ -1040,25 +1039,25 @@ export default function NikhilAdminDashboard({ onExit }) {
                           e.stopPropagation();
                           if (!isUpdating) handleTogglePacked(order, e);
                         }}
-                        className={`min-h-[44px] flex items-center justify-between px-3 py-2 rounded-lg border transition-colors cursor-pointer select-none ${
+                        className={`min-h-[44px] flex items-center justify-between px-3 py-2 rounded-xl border transition-colors cursor-pointer select-none ${
                           isPacked
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                            : 'bg-zinc-100 border-zinc-200 text-zinc-600'
+                            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800'
+                            : 'bg-zinc-100/80 border-zinc-200 text-zinc-600'
                         }`}
                       >
-                        <span className="text-xs font-bold uppercase tracking-wide">
+                        <span className="text-xs font-bold uppercase tracking-wider">
                           {isPacked ? 'STATUS: PACKED ✓' : 'STATUS: PENDING PACKING'}
                         </span>
 
-                        {/* iOS-Style Toggle Switch */}
+                        {/* Pixel-Perfect iOS Toggle Switch */}
                         <div
-                          className={`w-12 h-7 rounded-full relative transition-colors duration-200 shrink-0 ${
+                          className={`w-12 h-6 rounded-full relative transition-colors duration-200 shrink-0 ${
                             isPacked ? 'bg-emerald-600' : 'bg-zinc-300'
                           }`}
                         >
                           <div
-                            className={`w-5.5 h-5.5 rounded-full bg-white shadow-md absolute top-0.75 transition-all duration-200 ${
-                              isPacked ? 'left-5.5' : 'left-0.75'
+                            className={`w-[18px] h-[18px] rounded-full bg-white shadow-xs absolute top-[3px] transition-all duration-200 ${
+                              isPacked ? 'left-[27px]' : 'left-[3px]'
                             }`}
                           />
                         </div>
@@ -1077,13 +1076,13 @@ export default function NikhilAdminDashboard({ onExit }) {
             TAB 3: CATALOG TAB (QUICK PRODUCT ENTRY & DELETION)
         ======================================================== */}
         {activeTab === 'catalog' && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4">
             
             {/* 1. Quick Mobile Product Entry Form */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
-              <div className="flex items-center gap-2 pb-3 mb-4 border-b border-zinc-200">
-                <PlusCircle size={18} className="text-zinc-900" />
-                <h2 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
+            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 mb-3.5 border-b border-zinc-100">
+                <PlusCircle size={16} className="text-zinc-900" />
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-zinc-900">
                   QUICK MOBILE PRODUCT ENTRY
                 </h2>
               </div>
@@ -1092,39 +1091,38 @@ export default function NikhilAdminDashboard({ onExit }) {
                 
                 {/* Image Upload Area: No capture attribute so native camera/gallery selection appears */}
                 <div>
-                  <label className="text-xs font-bold text-zinc-900 block mb-1.5 uppercase">
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                     PRODUCT IMAGE *
                   </label>
                   
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full min-h-[160px] border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-lg bg-zinc-50 flex flex-col items-center justify-center p-4 cursor-pointer transition-colors"
+                    className="w-full min-h-[150px] border-2 border-dashed border-zinc-300 hover:border-zinc-400 rounded-xl bg-zinc-50 flex flex-col items-center justify-center p-4 cursor-pointer transition-colors"
                   >
                     {imagePreview ? (
-                      <div className="relative w-full h-44">
+                      <div className="relative w-full h-40">
                         <img
                           src={imagePreview}
                           alt="Product Preview"
-                          className="w-full h-full object-contain rounded"
+                          className="w-full h-full object-contain rounded-lg"
                         />
-                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded">
+                        <div className="absolute bottom-2 right-2 bg-black/85 text-white text-[10px] font-bold px-2 py-1 rounded-md">
                           TAP TO CHANGE
                         </div>
                       </div>
                     ) : (
                       <>
-                        <Camera size={32} className="text-zinc-400 mb-2" />
+                        <Camera size={28} className="text-zinc-400 mb-1.5" />
                         <span className="text-sm font-bold text-zinc-800">
-                          TAP TO SNAP OR CHOOSE PHOTO
+                          SNAP OR CHOOSE PHOTO
                         </span>
-                        <span className="text-[11px] text-zinc-500 mt-1">
-                          Selects from Camera or Photo Library (Max 50MB)
+                        <span className="text-[11px] text-zinc-400 mt-0.5">
+                          Native Camera or Gallery (Max 50MB)
                         </span>
                       </>
                     )}
                   </div>
 
-                  {/* Standard file input without capture attribute */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1136,7 +1134,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
                 {/* Title */}
                 <div>
-                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                     GARMENT TITLE *
                   </label>
                   <input
@@ -1146,21 +1144,21 @@ export default function NikhilAdminDashboard({ onExit }) {
                     value={productForm.title}
                     onChange={handleProductFormChange}
                     placeholder="e.g. Heavyweight Mineral Washed Boxy Tee"
-                    className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                    className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                   />
                 </div>
 
                 {/* Category & Condition Grade */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                       CATEGORY *
                     </label>
                     <select
                       name="category"
                       value={productForm.category}
                       onChange={handleProductFormChange}
-                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                      className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                     >
                       <option value="t-shirts">T-Shirts</option>
                       <option value="shirts">Shirts</option>
@@ -1172,14 +1170,14 @@ export default function NikhilAdminDashboard({ onExit }) {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                       CONDITION GRADE *
                     </label>
                     <select
                       name="conditionGrade"
                       value={productForm.conditionGrade}
                       onChange={handleProductFormChange}
-                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                      className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                     >
                       <option value="New / Unused">New / Unused</option>
                       <option value="Pristine">Pristine</option>
@@ -1193,7 +1191,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 {/* Selling Price & Original Price */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                       SELLING PRICE (₹) *
                     </label>
                     <input
@@ -1204,12 +1202,12 @@ export default function NikhilAdminDashboard({ onExit }) {
                       value={productForm.sellingPrice}
                       onChange={handleProductFormChange}
                       placeholder="1599"
-                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                      className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase">
+                    <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase tracking-wider">
                       ORIGINAL PRICE (₹)
                     </label>
                     <input
@@ -1219,14 +1217,14 @@ export default function NikhilAdminDashboard({ onExit }) {
                       value={productForm.originalPrice}
                       onChange={handleProductFormChange}
                       placeholder="2999"
-                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                      className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                     />
                   </div>
                 </div>
 
                 {/* Delivery Charge */}
                 <div>
-                  <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase">
+                  <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase tracking-wider">
                     DELIVERY CHARGE (₹)
                   </label>
                   <input
@@ -1236,18 +1234,18 @@ export default function NikhilAdminDashboard({ onExit }) {
                     value={productForm.deliveryCharge}
                     onChange={handleProductFormChange}
                     placeholder="0"
-                    className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                    className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                   />
                 </div>
 
                 {/* Measurements Grid (2x2) */}
                 <div>
-                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                     MEASUREMENTS (INCHES)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <span className="text-[11px] text-zinc-500">Chest</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Chest</span>
                       <input
                         type="number"
                         step="0.5"
@@ -1255,11 +1253,11 @@ export default function NikhilAdminDashboard({ onExit }) {
                         value={productForm.chest}
                         onChange={handleProductFormChange}
                         placeholder="46"
-                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
+                        className="w-full min-h-[38px] bg-white border border-zinc-200 rounded-lg px-2.5 text-base sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
                       />
                     </div>
                     <div>
-                      <span className="text-[11px] text-zinc-500">Length</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Length</span>
                       <input
                         type="number"
                         step="0.5"
@@ -1267,11 +1265,11 @@ export default function NikhilAdminDashboard({ onExit }) {
                         value={productForm.length}
                         onChange={handleProductFormChange}
                         placeholder="29"
-                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
+                        className="w-full min-h-[38px] bg-white border border-zinc-200 rounded-lg px-2.5 text-base sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
                       />
                     </div>
                     <div>
-                      <span className="text-[11px] text-zinc-500">Shoulder</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Shoulder</span>
                       <input
                         type="number"
                         step="0.5"
@@ -1279,11 +1277,11 @@ export default function NikhilAdminDashboard({ onExit }) {
                         value={productForm.shoulder}
                         onChange={handleProductFormChange}
                         placeholder="21"
-                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
+                        className="w-full min-h-[38px] bg-white border border-zinc-200 rounded-lg px-2.5 text-base sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
                       />
                     </div>
                     <div>
-                      <span className="text-[11px] text-zinc-500">Sleeve</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Sleeve</span>
                       <input
                         type="number"
                         step="0.5"
@@ -1291,7 +1289,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                         value={productForm.sleeve}
                         onChange={handleProductFormChange}
                         placeholder="10"
-                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
+                        className="w-full min-h-[38px] bg-white border border-zinc-200 rounded-lg px-2.5 text-base sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
                       />
                     </div>
                   </div>
@@ -1299,7 +1297,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
                 {/* Condition Notes */}
                 <div>
-                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                     CONDITION NOTES
                   </label>
                   <textarea
@@ -1308,7 +1306,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                     value={productForm.conditionNotes}
                     onChange={handleProductFormChange}
                     placeholder="Flawless archival piece, heavy collar ribbing."
-                    className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
+                    className="w-full p-2.5 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl text-base sm:text-sm text-zinc-900 focus:outline-none shadow-xs"
                   />
                 </div>
 
@@ -1316,16 +1314,16 @@ export default function NikhilAdminDashboard({ onExit }) {
                 <button
                   type="submit"
                   disabled={submittingProduct}
-                  className="w-full min-h-[50px] bg-[#121212] text-white rounded-lg text-sm font-extrabold tracking-wide uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60"
+                  className="w-full min-h-[48px] bg-[#121212] text-white rounded-xl text-xs font-extrabold tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60 shadow-xs"
                 >
                   {submittingProduct ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={15} className="animate-spin" />
                       <span>UPLOADING TO SUPABASE...</span>
                     </>
                   ) : (
                     <>
-                      <PlusCircle size={17} />
+                      <PlusCircle size={15} />
                       <span>PUBLISH 1-OF-1 PIECE</span>
                     </>
                   )}
@@ -1335,29 +1333,29 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* 2. Existing Catalog List & Deletion */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200">
-                <h2 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
+            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-100">
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-zinc-900">
                   EXISTING PRODUCTS ({products.length})
                 </h2>
 
                 <button
                   onClick={fetchCatalog}
                   disabled={loadingProducts}
-                  className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <RefreshCw size={12} className={loadingProducts ? 'animate-spin' : ''} />
+                  <RefreshCw size={11} className={loadingProducts ? 'animate-spin' : ''} />
                   <span>REFRESH</span>
                 </button>
               </div>
 
               {loadingProducts ? (
                 <div className="py-8 text-center text-xs text-zinc-500">
-                  <Loader2 size={20} className="animate-spin mx-auto mb-2 text-zinc-500" />
+                  <Loader2 size={18} className="animate-spin mx-auto mb-2 text-zinc-500" />
                   Loading products from Supabase...
                 </div>
               ) : products.length === 0 ? (
-                <div className="py-8 text-center text-xs text-zinc-500">
+                <div className="py-8 text-center text-xs text-zinc-400">
                   No products in Supabase catalog yet.
                 </div>
               ) : (
@@ -1370,28 +1368,28 @@ export default function NikhilAdminDashboard({ onExit }) {
                     return (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between p-2.5 border border-zinc-200 rounded-lg bg-white gap-3 hover:border-zinc-300 transition-colors"
+                        className="flex items-center justify-between p-2.5 border border-zinc-200 rounded-xl bg-white gap-3 hover:border-zinc-300 transition-colors"
                       >
                         {img ? (
                           <img
                             src={img}
                             alt={item.name}
-                            className="w-14 h-18 object-cover rounded bg-zinc-100 shrink-0 border border-zinc-200"
+                            className="w-[52px] h-[64px] object-cover rounded-lg bg-zinc-100 shrink-0 border border-zinc-200 shadow-2xs"
                           />
                         ) : (
-                          <div className="w-14 h-18 rounded bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 border border-zinc-200">
+                          <div className="w-[52px] h-[64px] rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 border border-zinc-200">
                             <Package size={18} />
                           </div>
                         )}
 
                         <div className="flex-1 min-w-0">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                          <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">
                             {item.sku || item.category_id}
                           </span>
                           <div className="text-xs font-bold text-zinc-900 truncate mt-0.5">
                             {item.name}
                           </div>
-                          <div className="text-xs font-black text-zinc-900 mt-1">
+                          <div className="text-xs font-black text-zinc-900 mt-0.5">
                             ₹{(parseFloat(item.selling_price) || 0).toLocaleString('en-IN')}
                           </div>
                         </div>
@@ -1401,9 +1399,9 @@ export default function NikhilAdminDashboard({ onExit }) {
                           onClick={() => handleDeleteProduct(item)}
                           title="Delete piece from Supabase"
                           aria-label={`Delete ${item.name}`}
-                          className="min-w-[42px] min-h-[42px] bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-lg flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                          className="w-10 h-10 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-xl flex items-center justify-center cursor-pointer transition-colors shrink-0"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     );
@@ -1419,15 +1417,15 @@ export default function NikhilAdminDashboard({ onExit }) {
             TAB 4: DROP ALERTS TAB (BROADCAST BLAST)
         ======================================================== */}
         {activeTab === 'drop-alerts' && (
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200">
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-zinc-100">
               <div className="flex items-center gap-2">
-                <Bell size={18} className="text-zinc-900" />
-                <h1 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
+                <Bell size={16} className="text-zinc-900" />
+                <h1 className="text-sm font-extrabold uppercase tracking-wide text-zinc-900">
                   DROP ALERTS BROADCAST
                 </h1>
               </div>
-              <span className="text-[10px] font-black tracking-wider bg-zinc-900 text-white px-2 py-0.5 rounded uppercase">
+              <span className="text-[10px] font-black tracking-wider bg-zinc-900 text-white px-2 py-0.5 rounded-full uppercase">
                 BCC BLAST
               </span>
             </div>
@@ -1438,22 +1436,22 @@ export default function NikhilAdminDashboard({ onExit }) {
 
             {/* Status Feedback */}
             {broadcastStatus?.type === 'success' && (
-              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-800 text-xs font-bold mb-4 flex items-center gap-2">
-                <CheckCircle2 size={17} className="shrink-0 text-emerald-600" />
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs font-bold mb-3.5 flex items-center gap-2 shadow-xs">
+                <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
                 <span>{broadcastStatus.text}</span>
               </div>
             )}
 
             {broadcastStatus?.type === 'error' && (
-              <div className="p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-xs font-semibold mb-4 flex items-center gap-2">
-                <AlertTriangle size={17} className="shrink-0 text-red-600" />
+              <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-red-700 text-xs font-semibold mb-3.5 flex items-center gap-2 shadow-xs">
+                <AlertTriangle size={16} className="shrink-0 text-red-600" />
                 <span>{broadcastStatus.text}</span>
               </div>
             )}
 
             <form onSubmit={handleSendBroadcast} className="flex flex-col gap-3.5">
               <div>
-                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                   DROP ALERT SUBJECT *
                 </label>
                 <input
@@ -1463,38 +1461,38 @@ export default function NikhilAdminDashboard({ onExit }) {
                   onChange={(e) => setBroadcastSubject(e.target.value)}
                   disabled={broadcastSending}
                   placeholder="e.g. DROP 05: ARCHIVAL HEAVYWEIGHT PIECES ARE LIVE"
-                  className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800 disabled:bg-zinc-100"
+                  className="w-full min-h-[44px] bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-base sm:text-sm text-zinc-900 focus:outline-none disabled:bg-zinc-100 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
                   MESSAGE CONTENT *
                 </label>
                 <textarea
-                  rows={6}
+                  rows={5}
                   required
                   value={broadcastMessage}
                   onChange={(e) => setBroadcastMessage(e.target.value)}
                   disabled={broadcastSending}
-                  placeholder="Enter the drop alert announcement for VIP subscribers (e.g., batch release notes, 1-of-1 link, special drops)..."
-                  className="w-full p-3 bg-white border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:border-zinc-800 disabled:bg-zinc-100 resize-y"
+                  placeholder="Enter the drop alert announcement for VIP subscribers..."
+                  className="w-full p-3 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl text-base sm:text-sm text-zinc-900 focus:outline-none disabled:bg-zinc-100 resize-y shadow-xs"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={broadcastSending}
-                className="w-full min-h-[50px] bg-[#121212] text-white rounded-lg text-sm font-extrabold tracking-wide uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60"
+                className="w-full min-h-[48px] bg-[#121212] text-white rounded-xl text-xs font-extrabold tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60 shadow-xs"
               >
                 {broadcastSending ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                     <span>Sending...</span>
                   </>
                 ) : (
                   <>
-                    <Send size={15} />
+                    <Send size={14} />
                     <span>SEND DROP ALERT BLAST</span>
                   </>
                 )}
@@ -1516,15 +1514,15 @@ export default function NikhilAdminDashboard({ onExit }) {
       {selectedOrder && (
         <div
           onClick={() => setSelectedOrder(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-none"
         >
-          {/* Ticket Card Container */}
+          {/* Ticket Card Container with max-height and internal scroll */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm sm:max-w-md bg-[#0D0D0E] text-white rounded-t-2xl shadow-2xl relative overflow-hidden border border-zinc-800 my-auto animate-in fade-in zoom-in-95 duration-200"
+            className="w-full max-w-sm sm:max-w-md bg-[#0D0D0E] text-white rounded-2xl shadow-2xl relative overflow-hidden border border-zinc-800/80 my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
           >
-            {/* Ticket Header Bar */}
-            <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+            {/* Ticket Top Header Bar */}
+            <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-950/80 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[11px] font-mono tracking-widest text-zinc-300 uppercase font-black">
@@ -1534,33 +1532,33 @@ export default function NikhilAdminDashboard({ onExit }) {
 
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-colors"
+                className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-colors"
                 aria-label="Close receipt"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Ticket Content Area */}
-            <div className="p-4 sm:p-5 space-y-4">
+            {/* Scrollable Ticket Content */}
+            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
               
-              {/* TOP SECTION: Large Total Payment & Thumbnail Photo of Ordered Product */}
+              {/* TOP SECTION: Large Total Payment & Thumbnail Photo */}
               {(() => {
                 const firstItem = selectedOrder.items?.[0] || {};
                 const productThumb = selectedOrder.product_image_url || firstItem.image || firstItem.image_url || firstItem.images?.[0];
                 const productTitle = firstItem.name || 'Curated Archival Piece';
 
                 return (
-                  <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 flex items-center justify-between gap-3">
+                  <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 sm:p-4 flex items-center justify-between gap-3">
                     {/* Left: Total Payment */}
                     <div className="flex flex-col justify-center min-w-0 flex-1">
-                      <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-black">
+                      <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-bold">
                         TOTAL PAYMENT
                       </span>
                       <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
                         ₹{(parseFloat(selectedOrder.total_amount) || 0).toLocaleString('en-IN')}
                       </div>
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
                           (selectedOrder.status || '').toUpperCase() === 'PACKED'
                             ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
@@ -1574,21 +1572,21 @@ export default function NikhilAdminDashboard({ onExit }) {
                       </div>
                     </div>
 
-                    {/* Right: Thumbnail photo of ordered product */}
+                    {/* Right: Thumbnail Photo */}
                     <div className="shrink-0 flex flex-col items-center">
                       {productThumb ? (
                         <img
                           src={productThumb}
                           alt={productTitle}
-                          className="w-18 h-22 sm:w-20 sm:h-24 object-cover rounded-lg bg-zinc-800 border border-zinc-700 shadow-md"
+                          className="w-[72px] h-[90px] object-cover rounded-lg bg-zinc-800 border border-zinc-700 shadow-md"
                         />
                       ) : (
-                        <div className="w-18 h-22 sm:w-20 sm:h-24 rounded-lg bg-zinc-800 border border-zinc-700 flex flex-col items-center justify-center text-zinc-500 shadow-md p-2 text-center">
+                        <div className="w-[72px] h-[90px] rounded-lg bg-zinc-800 border border-zinc-700 flex flex-col items-center justify-center text-zinc-500 shadow-md p-2 text-center">
                           <Package size={22} className="text-zinc-500 mb-1" />
                           <span className="text-[9px] text-zinc-400 uppercase font-bold">1-of-1 Piece</span>
                         </div>
                       )}
-                      <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[85px] mt-1 text-center">
+                      <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[80px] mt-1 text-center">
                         {productTitle}
                       </span>
                     </div>
@@ -1599,21 +1597,21 @@ export default function NikhilAdminDashboard({ onExit }) {
               {/* 2x2 GRID: Order ID, Date/Time, Customer Name, Phone Number */}
               <div className="grid grid-cols-2 gap-2.5">
                 {/* 1. Order ID */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
                     ORDER ID
                   </span>
-                  <span className="font-mono text-xs font-black text-white truncate block mt-1">
+                  <span className="font-mono text-xs font-black text-white truncate block mt-0.5">
                     #{selectedOrder.order_number || selectedOrder.id.slice(0, 8)}
                   </span>
                 </div>
 
                 {/* 2. Date/Time */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
                     DATE / TIME
                   </span>
-                  <span className="text-xs font-bold text-white truncate block mt-1">
+                  <span className="text-xs font-bold text-white truncate block mt-0.5">
                     {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('en-IN', {
                       day: 'numeric',
                       month: 'short',
@@ -1626,21 +1624,21 @@ export default function NikhilAdminDashboard({ onExit }) {
                 </div>
 
                 {/* 3. Customer Name */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
                     CUSTOMER NAME
                   </span>
-                  <span className="text-xs font-bold text-white truncate block mt-1">
+                  <span className="text-xs font-bold text-white truncate block mt-0.5">
                     {selectedOrder.customer_name || 'Customer'}
                   </span>
                 </div>
 
                 {/* 4. Phone Number */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
                     PHONE NUMBER
                   </span>
-                  <span className="text-xs font-bold text-white truncate block mt-1">
+                  <span className="text-xs font-bold text-white truncate block mt-0.5">
                     {selectedOrder.phone_number || selectedOrder.shipping_address?.phone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}
                   </span>
                 </div>
@@ -1649,7 +1647,7 @@ export default function NikhilAdminDashboard({ onExit }) {
               {/* FULL-WIDTH SECTION: Shipping Address & Customer Email */}
               <div className="flex flex-col gap-2.5">
                 {/* Shipping Address */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3.5 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 sm:p-3.5 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
                     SHIPPING ADDRESS
                   </span>
@@ -1676,7 +1674,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 </div>
 
                 {/* Customer Email */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3.5 rounded-lg">
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 sm:p-3.5 rounded-lg">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
                     CUSTOMER EMAIL
                   </span>
@@ -1689,38 +1687,38 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* Perforated Dashed Line with Semicircular Ticket Cutouts */}
-            <div className="relative py-2.5">
-              <div className="w-5 h-5 rounded-full bg-black/90 border border-zinc-800 absolute -left-2.5 top-1/2 -translate-y-1/2" />
-              <div className="w-5 h-5 rounded-full bg-black/90 border border-zinc-800 absolute -right-2.5 top-1/2 -translate-y-1/2" />
-              <div className="w-full border-b-2 border-dashed border-zinc-700" />
+            <div className="relative py-2 shrink-0 select-none">
+              <div className="w-5 h-5 rounded-full bg-[#000000] border border-zinc-800 absolute -left-2.5 top-1/2 -translate-y-1/2" />
+              <div className="w-5 h-5 rounded-full bg-[#000000] border border-zinc-800 absolute -right-2.5 top-1/2 -translate-y-1/2" />
+              <div className="w-full border-b border-dashed border-zinc-700/80" />
             </div>
 
             {/* Ticket Footer Action Buttons: Close & Download PDF */}
-            <div className="grid grid-cols-2 gap-2.5 p-4 pt-1 pb-5">
+            <div className="grid grid-cols-2 gap-2.5 p-4 pt-1 pb-3 shrink-0">
               <button
                 onClick={() => window.print()}
-                className="min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                className="min-h-[42px] bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
-                <Printer size={14} />
-                <span>DOWNLOAD PDF</span>
+                <Printer size={13} />
+                <span>PRINT / PDF</span>
               </button>
 
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="min-h-[44px] bg-white hover:bg-zinc-200 text-zinc-900 rounded-lg text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-colors"
+                className="min-h-[42px] bg-white hover:bg-zinc-200 text-zinc-900 rounded-xl text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-colors"
               >
                 CLOSE
               </button>
             </div>
 
             {/* Perforated / Jagged / Sawtooth Bottom Ticket Edge (SVG) */}
-            <div className="w-full overflow-hidden leading-none -mt-px select-none">
+            <div className="w-full overflow-hidden leading-none select-none shrink-0">
               <svg
-                viewBox="0 0 400 16"
+                viewBox="0 0 400 14"
                 preserveAspectRatio="none"
-                className="w-full h-4 text-[#0D0D0E] fill-current block"
+                className="w-full h-3.5 text-[#0D0D0E] fill-current block"
               >
-                <polygon points="0,0 10,16 20,0 30,16 40,0 50,16 60,0 70,16 80,0 90,16 100,0 110,16 120,0 130,16 140,0 150,16 160,0 170,16 180,0 190,16 200,0 210,16 220,0 230,16 240,0 250,16 260,0 270,16 280,0 290,16 300,0 310,16 320,0 330,16 340,0 350,16 360,0 370,16 380,0 390,16 400,0" />
+                <polygon points="0,0 10,14 20,0 30,14 40,0 50,14 60,0 70,14 80,0 90,14 100,0 110,14 120,0 130,14 140,0 150,14 160,0 170,14 180,0 190,14 200,0 210,14 220,0 230,14 240,0 250,14 260,0 270,14 280,0 290,14 300,0 310,14 320,0 330,14 340,0 350,14 360,0 370,14 380,0 390,14 400,0" />
               </svg>
             </div>
 
@@ -1731,9 +1729,15 @@ export default function NikhilAdminDashboard({ onExit }) {
       {/* ========================================================
           4. MOBILE-FIRST FIXED BOTTOM NAVIGATION BAR
           Tabs: Dashboard, Orders, Catalog, Drop Alerts
-          (No desktop sidebars)
+          With iPhone Safe-Area-Inset Support
       ======================================================== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0B0C] border-t border-zinc-800 h-16 flex items-center justify-around px-2 max-w-full">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0B0C]/95 backdrop-blur-md border-t border-zinc-800/80 flex items-center justify-around px-2 max-w-full"
+        style={{
+          height: 'calc(62px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
         
         {/* Tab 1: Dashboard */}
         <button
@@ -1743,8 +1747,8 @@ export default function NikhilAdminDashboard({ onExit }) {
             activeTab === 'dashboard' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          <LayoutDashboard size={20} className={activeTab === 'dashboard' ? 'text-white' : 'text-zinc-500'} />
-          <span className={`text-[11px] tracking-wide ${activeTab === 'dashboard' ? 'font-black' : 'font-semibold'}`}>
+          <LayoutDashboard size={19} className={activeTab === 'dashboard' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[10px] tracking-wider uppercase ${activeTab === 'dashboard' ? 'font-black' : 'font-semibold'}`}>
             Dashboard
           </span>
         </button>
@@ -1758,14 +1762,14 @@ export default function NikhilAdminDashboard({ onExit }) {
           }`}
         >
           <div className="relative">
-            <ShoppingBag size={20} className={activeTab === 'orders' ? 'text-white' : 'text-zinc-500'} />
+            <ShoppingBag size={19} className={activeTab === 'orders' ? 'text-white' : 'text-zinc-500'} />
             {pendingCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
                 {pendingCount}
               </span>
             )}
           </div>
-          <span className={`text-[11px] tracking-wide ${activeTab === 'orders' ? 'font-black' : 'font-semibold'}`}>
+          <span className={`text-[10px] tracking-wider uppercase ${activeTab === 'orders' ? 'font-black' : 'font-semibold'}`}>
             Orders
           </span>
         </button>
@@ -1778,8 +1782,8 @@ export default function NikhilAdminDashboard({ onExit }) {
             activeTab === 'catalog' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          <Package size={20} className={activeTab === 'catalog' ? 'text-white' : 'text-zinc-500'} />
-          <span className={`text-[11px] tracking-wide ${activeTab === 'catalog' ? 'font-black' : 'font-semibold'}`}>
+          <Package size={19} className={activeTab === 'catalog' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[10px] tracking-wider uppercase ${activeTab === 'catalog' ? 'font-black' : 'font-semibold'}`}>
             Catalog
           </span>
         </button>
@@ -1792,8 +1796,8 @@ export default function NikhilAdminDashboard({ onExit }) {
             activeTab === 'drop-alerts' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          <Bell size={20} className={activeTab === 'drop-alerts' ? 'text-white' : 'text-zinc-500'} />
-          <span className={`text-[11px] tracking-wide ${activeTab === 'drop-alerts' ? 'font-black' : 'font-semibold'}`}>
+          <Bell size={19} className={activeTab === 'drop-alerts' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[10px] tracking-wider uppercase ${activeTab === 'drop-alerts' ? 'font-black' : 'font-semibold'}`}>
             Drop Alerts
           </span>
         </button>
