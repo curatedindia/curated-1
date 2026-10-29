@@ -137,9 +137,15 @@ export default function App() {
       const hash = window.location.hash;
       const search = window.location.search;
 
-      // Automatically navigate to dedicated admin dashboard if user lands on /nikhil
+      // Lock the /nikhil route: strictly redirect to / if user.email is not hello.curatedindia@gmail.com
       if (pathname === '/nikhil') {
-        setCurrentView('nikhil');
+        const email = (authUser?.email || '').toLowerCase().trim();
+        if (authUser && email !== 'hello.curatedindia@gmail.com') {
+          window.history.replaceState({}, '', '/');
+          setCurrentView('home');
+        } else {
+          setCurrentView('nikhil');
+        }
         setCheckoutModalOpen(false);
       } else if (pathname === '/orders') {
         setCurrentView('orders');
@@ -163,8 +169,14 @@ export default function App() {
       if (session?.user) {
         setAuthUser(session.user);
         const path = window.location.pathname.replace(/\/+$/, '');
+        const email = (session.user.email || '').toLowerCase().trim();
         if (path === '/nikhil') {
-          setCurrentView('nikhil');
+          if (email !== 'hello.curatedindia@gmail.com') {
+            window.history.replaceState({}, '', '/');
+            setCurrentView('home');
+          } else {
+            setCurrentView('nikhil');
+          }
           setCheckoutModalOpen(false);
         } else if (path === '/checkout' || window.location.hash.includes('access_token')) {
           setCurrentView('checkout');
@@ -172,6 +184,10 @@ export default function App() {
         }
       } else if (event === 'SIGNED_OUT') {
         setAuthUser(null);
+        const path = window.location.pathname.replace(/\/+$/, '');
+        if (path === '/nikhil') {
+          // If signed out while on /nikhil, keep view on nikhil login gate or stay as is
+        }
       }
     });
 
@@ -179,12 +195,31 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setAuthUser(session.user);
+        const path = window.location.pathname.replace(/\/+$/, '');
+        const email = (session.user.email || '').toLowerCase().trim();
+        if (path === '/nikhil' && email !== 'hello.curatedindia@gmail.com') {
+          window.history.replaceState({}, '', '/');
+          setCurrentView('home');
+        }
       }
     });
+
+    // Real-time synchronization of storefront inventory from Supabase products table
+    const productsChannel = supabase
+      .channel('storefront-products-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchProductsAndSettings();
+        }
+      )
+      .subscribe();
 
     return () => {
       window.removeEventListener('popstate', handleLocationChange);
       authListener?.subscription?.unsubscribe();
+      productsChannel?.unsubscribe();
     };
   }, []);
 

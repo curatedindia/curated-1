@@ -172,6 +172,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
   order_number TEXT,
   customer_name TEXT NOT NULL,
   customer_email TEXT NOT NULL,
+  phone_number TEXT,
+  product_image_url TEXT,
   total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'PENDING',
   payment_status TEXT DEFAULT 'PAID',
@@ -179,6 +181,11 @@ CREATE TABLE IF NOT EXISTS public.orders (
   shipping_address JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure orders table columns exist if table was already created
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS phone_number TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS product_image_url TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_address JSONB DEFAULT '{}'::jsonb;
 
 -- Enable RLS on orders table
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;

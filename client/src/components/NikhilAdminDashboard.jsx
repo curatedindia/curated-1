@@ -1,45 +1,34 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-  ShieldCheck,
-  Lock,
-  PlusCircle,
-  Trash2,
-  Upload,
-  Image as ImageIcon,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowLeft,
-  LogOut,
-  RefreshCw,
-  ExternalLink,
-  Layers,
-  Tag,
-  DollarSign,
-  Maximize2,
   LayoutDashboard,
   ShoppingBag,
   Package,
-  Settings,
-  History,
-  Check,
-  Clock,
-  TrendingUp,
-  Filter,
-  Calendar,
-  Search,
-  Camera,
-  ChevronRight,
-  Send,
   Bell,
-  Loader2
+  TrendingUp,
+  CheckCircle2,
+  Clock,
+  Search,
+  RefreshCw,
+  Trash2,
+  PlusCircle,
+  Camera,
+  Send,
+  Loader2,
+  AlertTriangle,
+  ExternalLink,
+  LogOut,
+  X,
+  ShieldCheck,
+  Lock,
+  ChevronRight,
+  Printer
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
 const REQUIRED_ADMIN_EMAIL = 'hello.curatedindia@gmail.com';
 
-
 export default function NikhilAdminDashboard({ onExit }) {
-  // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'settings' | 'activity'
+  // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'drop-alerts'
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Authentication & Guard State
@@ -48,15 +37,20 @@ export default function NikhilAdminDashboard({ onExit }) {
   const [authError, setAuthError] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  // Orders State (The 'Tick' System)
+  // Real-Time Dashboard Stats State
+  const [revenue, setRevenue] = useState(0);
+  const [packedCount, setPackedCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [catalogCount, setCatalogCount] = useState(0);
+  const [revenueTimeframe, setRevenueTimeframe] = useState('month'); // 'day' | 'month' | 'year' | 'all'
+
+  // Orders State & Receipt Modal
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [orderSearch, setOrderSearch] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
-
-  // Dashboard Stats State
-  const [revenueTimeframe, setRevenueTimeframe] = useState('month'); // 'day' | 'month' | 'year' | 'all'
+  const [orderStatusFilter, setOrderStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'PACKED'
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Catalog State
   const [products, setProducts] = useState([]);
@@ -68,8 +62,8 @@ export default function NikhilAdminDashboard({ onExit }) {
   const fileInputRef = useRef(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
+  const [submittingProduct, setSubmittingProduct] = useState(false);
+  const [productForm, setProductForm] = useState({
     title: '',
     category: 't-shirts',
     conditionGrade: 'New / Unused',
@@ -83,35 +77,108 @@ export default function NikhilAdminDashboard({ onExit }) {
     conditionNotes: ''
   });
 
-  // Settings State
-  const [settings, setSettings] = useState({
-    shipping_free_threshold: 1499,
-    shipping_flat_rate: 99,
-    cart_hold_duration_minutes: 10,
-    concierge_email: 'hello.curatedindia@gmail.com',
-    sold_out_section_enabled: true,
-    marquee_headline: 'CURATED | SEARCHED • FILTERED • QUALITY CHECKED • HANDPICKED'
-  });
-  const [settingsSaved, setSettingsSaved] = useState(false);
-
   // Drop Alerts Broadcast State
   const [broadcastSubject, setBroadcastSubject] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastStatus, setBroadcastStatus] = useState(null); // { type: 'success' | 'error', text: string }
 
-  // Activity Log State
-  const [activityLogs, setActivityLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [logFilter, setLogFilter] = useState('ALL');
+  // ========================================================
+  // REVENUE CALCULATION HELPER
+  // Dynamic calculation based on timeframe and order created_at
+  // ========================================================
+  const calculateRevenue = useCallback((orderList, timeframe) => {
+    const now = new Date();
+    return orderList.reduce((sum, o) => {
+      const orderDate = new Date(o.created_at);
+      if (isNaN(orderDate.getTime())) {
+        return sum + (parseFloat(o.total_amount) || 0);
+      }
+
+      let matches = true;
+      if (timeframe === 'day') {
+        const diffMs = now.getTime() - orderDate.getTime();
+        matches = diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000;
+      } else if (timeframe === 'month') {
+        const diffMs = now.getTime() - orderDate.getTime();
+        matches = diffMs >= 0 && diffMs <= 30 * 24 * 60 * 60 * 1000;
+      } else if (timeframe === 'year') {
+        matches = orderDate.getFullYear() === now.getFullYear();
+      } else if (timeframe === 'all') {
+        matches = true;
+      }
+
+      return matches ? sum + (parseFloat(o.total_amount) || 0) : sum;
+    }, 0);
+  }, []);
+
+  // Timeframe switch handler
+  const handleTimeframeChange = (newTf) => {
+    setRevenueTimeframe(newTf);
+    setRevenue(calculateRevenue(orders, newTf));
+  };
+
+  // ========================================================
+  // DATA FETCHERS
+  // ========================================================
+  const fetchOrders = useCallback(async (currentTf = revenueTimeframe) => {
+    setLoadingOrders(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders from Supabase:', error);
+      } else if (Array.isArray(data)) {
+        setOrders(data);
+        let packed = 0;
+        let pending = 0;
+        data.forEach((o) => {
+          if ((o.status || '').toUpperCase() === 'PACKED') packed += 1;
+          else pending += 1;
+        });
+        setPackedCount(packed);
+        setPendingCount(pending);
+        setRevenue(calculateRevenue(data, currentTf));
+      }
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [revenueTimeframe, calculateRevenue]);
+
+  const fetchCatalog = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching catalog from Supabase:', error);
+      } else if (Array.isArray(data)) {
+        setProducts(data);
+        setCatalogCount(data.length);
+      }
+    } catch (err) {
+      console.error('Failed to fetch catalog:', err);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
 
   // ========================================================
   // 1. STRICT ROUTE GUARD & AUTHENTICATION
+  // If user.email is NOT exactly hello.curatedindia@gmail.com, redirect to /
   // ========================================================
   useEffect(() => {
     let isMounted = true;
 
-    const enforceAdminSecurity = (user) => {
+    const enforceAdminSecurity = async (user) => {
       if (!user) {
         if (isMounted) {
           setCurrentUser(null);
@@ -122,9 +189,13 @@ export default function NikhilAdminDashboard({ onExit }) {
 
       const email = (user.email || '').toLowerCase().trim();
       if (email !== REQUIRED_ADMIN_EMAIL) {
-        console.warn(`[SECURITY VIOLATION] Unauthorized email: ${email}`);
+        console.warn(`[SECURITY VIOLATION] Unauthorized access attempt by: ${email}`);
         alert(`Access Denied. Only ${REQUIRED_ADMIN_EMAIL} is authorized.`);
-        supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.error(e);
+        }
         window.location.replace('/');
         return false;
       }
@@ -132,14 +203,13 @@ export default function NikhilAdminDashboard({ onExit }) {
       if (isMounted) {
         setCurrentUser(user);
         setAuthChecking(false);
-        fetchCatalog();
         fetchOrders();
-        fetchActivityLogs();
+        fetchCatalog();
       }
       return true;
     };
 
-    // Check existing session on mount
+    // Check existing active session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Session check error:', error);
@@ -156,16 +226,25 @@ export default function NikhilAdminDashboard({ onExit }) {
       }
     });
 
-    // Realtime listener for instant order synchronization
+    // Real-time Supabase subscriptions for orders and products
     const ordersChannel = supabase
       .channel('admin-orders-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
         () => {
-          if (isMounted) {
-            fetchOrders();
-          }
+          if (isMounted) fetchOrders();
+        }
+      )
+      .subscribe();
+
+    const productsChannel = supabase
+      .channel('admin-products-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          if (isMounted) fetchCatalog();
         }
       )
       .subscribe();
@@ -174,8 +253,9 @@ export default function NikhilAdminDashboard({ onExit }) {
       isMounted = false;
       authListener?.subscription?.unsubscribe();
       ordersChannel?.unsubscribe();
+      productsChannel?.unsubscribe();
     };
-  }, []);
+  }, [fetchOrders, fetchCatalog]);
 
   const handleAdminGoogleLogin = async () => {
     setIsSigningIn(true);
@@ -191,198 +271,21 @@ export default function NikhilAdminDashboard({ onExit }) {
         setAuthError(error.message);
         setIsSigningIn(false);
       }
-    } catch (err) {
+    } catch {
       setAuthError('Failed to trigger admin authentication.');
       setIsSigningIn(false);
     }
   };
 
   const handleAdminLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setCurrentUser(null);
     window.location.replace('/');
   };
 
-  // ========================================================
-  // 2. FETCH DATA (ORDERS, CATALOG, ACTIVITY LOGS)
-  // ========================================================
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && Array.isArray(data)) {
-        setOrders(data);
-      } else {
-        if (error) {
-          console.error('Error fetching orders from Supabase:', error);
-        }
-        setOrders([]);
-      }
-    } catch (err) {
-      console.error('Error fetching orders:', err);
-      setOrders([]);
-    } finally {
-      setLoadingOrders(false);
-    }
-  };
-
-  const fetchCatalog = async () => {
-    setLoadingProducts(true);
-    setActionError('');
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && Array.isArray(data)) {
-        setProducts(data);
-      } else {
-        if (error) {
-          console.error('Error fetching catalog from Supabase:', error);
-        }
-        setProducts([]);
-      }
-    } catch (err) {
-      console.error('Error fetching catalog:', err);
-      setActionError('Could not load products. Please check Supabase table configuration.');
-      setProducts([]);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  const fetchActivityLogs = async () => {
-    setLoadingLogs(true);
-    try {
-      const { data, error } = await supabase
-        .from('inventory_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && Array.isArray(data)) {
-        setActivityLogs(data);
-      } else {
-        if (error) {
-          console.error('Error fetching activity logs from Supabase:', error);
-        }
-        setActivityLogs([]);
-      }
-    } catch (err) {
-      console.error('Error fetching activity logs:', err);
-      setActivityLogs([]);
-    } finally {
-      setLoadingLogs(false);
-    }
-  };
-
-  // ========================================================
-  // 3. THE 'TICK' SYSTEM (PACKED TOGGLE FOR ORDERS)
-  // ========================================================
-  const handleTogglePacked = async (order) => {
-    const isCurrentlyPacked = (order.status || '').toUpperCase() === 'PACKED';
-    const newStatus = isCurrentlyPacked ? 'PENDING' : 'PACKED';
-
-    // Instant local state update (no page reload)
-    setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status: newStatus } : o))
-    );
-    setUpdatingOrderId(order.id);
-
-    try {
-      const { error: dbError } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', order.id);
-
-      if (dbError) {
-        console.warn('Supabase update warning:', dbError);
-      }
-
-      try {
-        await fetch(`/api/orders/${order.id}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus })
-        });
-      } catch {
-        // non-blocking
-      }
-
-      // Add to activity ledger
-      const newLogEntry = {
-        id: `tx-${Date.now()}`,
-        sku: order.items?.[0]?.sku || 'ORDER-PACK',
-        product_name: order.items?.[0]?.name || `Order #${order.order_number || order.id.slice(0, 8)}`,
-        quantity_change: 0,
-        reason: newStatus === 'PACKED' ? 'Order Marked as Packed' : 'Order Reverted to Pending',
-        admin_user: 'hello.curatedindia@gmail.com',
-        order_id: order.id,
-        note: `Order ${order.order_number || order.id} status changed to ${newStatus}`,
-        created_at: new Date().toISOString()
-      };
-      setActivityLogs((prev) => [newLogEntry, ...prev]);
-
-      setSuccessMessage(`✓ Order #${order.order_number || order.id.slice(0, 8)} is now ${newStatus}`);
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      console.error('Failed to update order status:', err);
-      setActionError('Could not update status. Reverting.');
-      setOrders((prev) =>
-        prev.map((o) => (o.id === order.id ? { ...o, status: order.status } : o))
-      );
-    } finally {
-      setUpdatingOrderId(null);
-    }
-  };
-
-  // ========================================================
-  // 4. STATS & REVENUE CALCULATIONS
-  // ========================================================
-  const packedOrdersCount = useMemo(() => {
-    return orders.filter((o) => (o.status || '').toUpperCase() === 'PACKED').length;
-  }, [orders]);
-
-  const pendingOrdersCount = useMemo(() => {
-    return orders.filter((o) => (o.status || '').toUpperCase() !== 'PACKED').length;
-  }, [orders]);
-
-  const totalOrdersCount = orders.length;
-
-  const filteredRevenue = useMemo(() => {
-    const now = new Date();
-    const validOrders = orders.filter((o) => {
-      const st = (o.status || '').toUpperCase();
-      const paySt = (o.payment_status || o.order_status || '').toUpperCase();
-      return st === 'PACKED' || paySt === 'CONFIRMED' || paySt === 'PAID';
-    });
-
-    return validOrders.reduce((sum, o) => {
-      const date = new Date(o.created_at);
-      if (isNaN(date.getTime())) return sum + (parseFloat(o.total_amount) || 0);
-
-      let matches = true;
-      if (revenueTimeframe === 'day') {
-        const diffHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-        matches = diffHours <= 24;
-      } else if (revenueTimeframe === 'month') {
-        const diffDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
-        matches = diffDays <= 30;
-      } else if (revenueTimeframe === 'year') {
-        matches = date.getFullYear() === now.getFullYear();
-      }
-
-      if (matches) {
-        return sum + (parseFloat(o.total_amount) || 0);
-      }
-      return sum;
-    }, 0);
-  }, [orders, revenueTimeframe]);
-
+  // Filtered orders for Orders Tab
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       const st = (o.status || '').toUpperCase();
@@ -400,33 +303,80 @@ export default function NikhilAdminDashboard({ onExit }) {
     });
   }, [orders, orderStatusFilter, orderSearch]);
 
-  const filteredActivityLogs = useMemo(() => {
-    if (logFilter === 'ALL') return activityLogs;
-    return activityLogs.filter((log) => {
-      const r = (log.reason || '').toUpperCase();
-      if (logFilter === 'SALE') return r.includes('SALE');
-      if (logFilter === 'STOCK') return r.includes('STOCK') || r.includes('ADDED');
-      if (logFilter === 'DELETE') return r.includes('DELETE') || r.includes('REMOVED');
-      return true;
+  // ========================================================
+  // 3. THE 'TICK' SYSTEM: PACKED/PENDING TOGGLE
+  // Must execute Supabase update instantly and use e.stopPropagation()
+  // ========================================================
+  const handleTogglePacked = async (order, e) => {
+    if (e && e.stopPropagation) {
+      e.stopPropagation();
+    }
+
+    const isCurrentlyPacked = (order.status || '').toUpperCase() === 'PACKED';
+    const newStatus = isCurrentlyPacked ? 'PENDING' : 'PACKED';
+
+    // Instant local state update
+    const updatedOrders = orders.map((o) =>
+      o.id === order.id ? { ...o, status: newStatus } : o
+    );
+    setOrders(updatedOrders);
+
+    // If modal is currently viewing this order, update it too
+    if (selectedOrder && selectedOrder.id === order.id) {
+      setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+    }
+
+    let packed = 0;
+    let pending = 0;
+    updatedOrders.forEach((o) => {
+      if ((o.status || '').toUpperCase() === 'PACKED') packed += 1;
+      else pending += 1;
     });
-  }, [activityLogs, logFilter]);
+    setPackedCount(packed);
+    setPendingCount(pending);
+    setRevenue(calculateRevenue(updatedOrders, revenueTimeframe));
+
+    setUpdatingOrderId(order.id);
+
+    try {
+      const { error: dbError } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', order.id);
+
+      if (dbError) {
+        throw new Error(dbError.message);
+      }
+
+      setSuccessMessage(`Order #${order.order_number || order.id.slice(0, 8)} updated to ${newStatus}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to update order status in Supabase:', err);
+      setActionError('Failed to update order status. Reverting changes.');
+      // Revert local state
+      const reverted = orders.map((o) =>
+        o.id === order.id ? { ...o, status: order.status } : o
+      );
+      setOrders(reverted);
+      setTimeout(() => setActionError(''), 4000);
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
 
   // ========================================================
-  // 5. CATALOG HANDLERS
+  // 4. CATALOG TAB: QUICK MOBILE PRODUCT ENTRY & DELETION
   // ========================================================
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      // JavaScript validation to block files over 50MB before uploading
       if (file.size > 50 * 1024 * 1024) {
+        alert('File size exceeds the 50MB limit. Please select an image under 50MB.');
         e.target.value = '';
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setImageFile(null);
         setImagePreview('');
-        const errorMsg = 'File exceeds the 50MB limit. Please select a smaller image.';
-        setActionError(errorMsg);
-        alert(errorMsg);
         return;
       }
       setActionError('');
@@ -436,8 +386,9 @@ export default function NikhilAdminDashboard({ onExit }) {
     }
   };
 
-  const handleFormChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleProductFormChange = (e) => {
+    const { name, value } = e.target;
+    setProductForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddProduct = async (e) => {
@@ -450,23 +401,24 @@ export default function NikhilAdminDashboard({ onExit }) {
       return;
     }
 
-    if (!form.title.trim()) {
-      setActionError('Please enter a product title.');
+    if (!productForm.title.trim()) {
+      setActionError('Please enter a garment title.');
       return;
     }
 
-    if (!form.sellingPrice || parseFloat(form.sellingPrice) <= 0) {
+    if (!productForm.sellingPrice || parseFloat(productForm.sellingPrice) <= 0) {
       setActionError('Please enter a valid selling price.');
       return;
     }
 
-    setSubmitting(true);
+    setSubmittingProduct(true);
     try {
       const fileExt = imageFile.name.split('.').pop() || 'jpg';
       const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const storagePath = `products/${cleanFileName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // 1. Upload to Supabase product-images storage bucket
+      const { error: uploadError } = await supabase.storage
         .from('product-images')
         .upload(storagePath, imageFile, {
           cacheControl: '3600',
@@ -474,45 +426,50 @@ export default function NikhilAdminDashboard({ onExit }) {
         });
 
       if (uploadError) {
-        throw new Error(`Image upload failed: ${uploadError.message}`);
+        throw new Error(`Storage upload failed: ${uploadError.message}`);
       }
 
+      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('product-images')
         .getPublicUrl(storagePath);
 
       if (!publicUrl) {
-        throw new Error('Failed to obtain image URL.');
+        throw new Error('Failed to obtain image public URL from Supabase.');
       }
 
-      const categoryCode = form.category.toUpperCase().slice(0, 2);
+      const categoryCode = productForm.category.toUpperCase().slice(0, 2);
       const generatedSku = `CUR-${categoryCode}-${Math.floor(100 + Math.random() * 900)}`;
-      const generatedSlug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const generatedSlug = productForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
       const newProductPayload = {
         sku: generatedSku,
-        name: form.title.trim(),
+        name: productForm.title.trim(),
         slug: generatedSlug,
-        category_id: form.category,
-        condition: form.conditionGrade,
-        condition_notes: form.conditionNotes.trim() || 'Pristine authentic 1-of-1 piece.',
-        selling_price: parseFloat(form.sellingPrice),
-        original_price: parseFloat(form.originalPrice) || parseFloat(form.sellingPrice) * 2,
-        cost_price: parseFloat(form.deliveryCharge) || 0,
+        category_id: productForm.category,
+        condition: productForm.conditionGrade,
+        condition_notes: productForm.conditionNotes.trim() || 'Pristine authentic 1-of-1 piece.',
+        selling_price: parseFloat(productForm.sellingPrice),
+        original_price: productForm.originalPrice ? parseFloat(productForm.originalPrice) : null,
+        delivery_charge: parseFloat(productForm.deliveryCharge) || 0,
+        cost_price: 0,
         measurements: {
-          chest: parseFloat(form.chest) || 0,
-          length: parseFloat(form.length) || 0,
-          shoulder: parseFloat(form.shoulder) || 0,
-          sleeve: parseFloat(form.sleeve) || 0,
-          delivery_charge: parseFloat(form.deliveryCharge) || 0,
+          chest: parseFloat(productForm.chest) || 0,
+          length: parseFloat(productForm.length) || 0,
+          shoulder: parseFloat(productForm.shoulder) || 0,
+          sleeve: parseFloat(productForm.sleeve) || 0,
           unit: 'in'
         },
         images: [publicUrl],
         status: 'ACTIVE',
         is_new_drop: true,
+        total_on_hand: 1,
+        total_available: 1,
+        pieces_sold: 0,
         created_at: new Date().toISOString()
       };
 
+      // 3. Insert row into products table
       const { error: insertError } = await supabase
         .from('products')
         .insert([newProductPayload]);
@@ -521,24 +478,11 @@ export default function NikhilAdminDashboard({ onExit }) {
         throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      // Record in activity log
-      setActivityLogs((prev) => [
-        {
-          id: `tx-${Date.now()}`,
-          sku: generatedSku,
-          product_name: form.title.trim(),
-          quantity_change: 1,
-          reason: 'Initial Stock Added',
-          admin_user: 'hello.curatedindia@gmail.com',
-          order_id: null,
-          note: `New piece published at ₹${form.sellingPrice}`,
-          created_at: new Date().toISOString()
-        },
-        ...prev
-      ]);
+      setSuccessMessage(`✓ '${productForm.title}' published successfully!`);
+      setTimeout(() => setSuccessMessage(''), 4000);
 
-      setSuccessMessage(`✓ '${form.title}' published successfully!`);
-      setForm({
+      // Reset Form
+      setProductForm({
         title: '',
         category: 't-shirts',
         conditionGrade: 'New / Unused',
@@ -555,17 +499,18 @@ export default function NikhilAdminDashboard({ onExit }) {
       setImagePreview('');
       if (fileInputRef.current) fileInputRef.current.value = '';
 
+      // Refresh catalog from Supabase
       fetchCatalog();
     } catch (err) {
       console.error('Error adding product:', err);
-      setActionError(err.message || 'Failed to add product.');
+      setActionError(err.message || 'Failed to add product to Supabase.');
     } finally {
-      setSubmitting(false);
+      setSubmittingProduct(false);
     }
   };
 
   const handleDeleteProduct = async (product) => {
-    const confirmDelete = window.confirm(`Delete "${product.name}" (${product.sku || product.id})?`);
+    const confirmDelete = window.confirm(`Permanently delete "${product.name}" (${product.sku || product.id}) from Supabase?`);
     if (!confirmDelete) return;
 
     setActionError('');
@@ -582,36 +527,18 @@ export default function NikhilAdminDashboard({ onExit }) {
       }
 
       setProducts((prev) => prev.filter((p) => p.id !== product.id));
-
-      setActivityLogs((prev) => [
-        {
-          id: `tx-${Date.now()}`,
-          sku: product.sku || product.id,
-          product_name: product.name,
-          quantity_change: -1,
-          reason: 'Product Deleted',
-          admin_user: 'hello.curatedindia@gmail.com',
-          order_id: null,
-          note: `Piece removed from catalog`,
-          created_at: new Date().toISOString()
-        },
-        ...prev
-      ]);
-
-      setSuccessMessage(`✓ Deleted "${product.name}" from catalog.`);
+      setCatalogCount((prev) => Math.max(0, prev - 1));
+      setSuccessMessage(`✓ Removed "${product.name}" from catalog.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Delete error:', err);
-      setActionError(err.message || 'Unable to delete product.');
+      setActionError(err.message || 'Failed to delete product from Supabase.');
     }
   };
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 3000);
-  };
-
-  // Drop Alerts Broadcast Submit Handler
+  // ========================================================
+  // 5. DROP ALERTS TAB: BROADCAST TO NEWSLETTER
+  // ========================================================
   const handleSendBroadcast = async (e) => {
     e.preventDefault();
     if (!broadcastSubject.trim()) {
@@ -645,13 +572,13 @@ export default function NikhilAdminDashboard({ onExit }) {
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(res.ok ? text : `Server returned status ${res.status}. Please ensure backend route is reachable.`);
+        throw new Error(res.ok ? text : `Server returned ${res.status}.`);
       }
 
       if (res.ok && data.success) {
         setBroadcastStatus({
           type: 'success',
-          text: `Sent to ${data.count !== undefined ? data.count : 0} subscribers`
+          text: `Sent! Alert delivered to ${data.count !== undefined ? data.count : 'all'} subscribers via private BCC.`
         });
         setBroadcastSubject('');
         setBroadcastMessage('');
@@ -662,7 +589,7 @@ export default function NikhilAdminDashboard({ onExit }) {
         });
       }
     } catch (err) {
-      console.error('[Admin] Broadcast error:', err);
+      console.error('Broadcast error:', err);
       setBroadcastStatus({
         type: 'error',
         text: err.message || 'Network error while broadcasting drop alert.'
@@ -672,221 +599,15 @@ export default function NikhilAdminDashboard({ onExit }) {
     }
   };
 
-  // Render Helper: Drop Alerts Broadcast Card
-  const renderDropAlertsBroadcastCard = () => (
-    <div style={{
-      backgroundColor: '#FFFFFF',
-      border: '1px solid #E4E4E7',
-      borderRadius: '8px',
-      padding: '18px 16px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-      boxSizing: 'border-box',
-      width: '100%'
-    }}>
-      {/* Header */}
-      <div style={{ borderBottom: '1px solid #E4E4E7', paddingBottom: '12px', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bell size={20} color="#121212" />
-            <h2 style={{
-              fontSize: '16px',
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              margin: 0,
-              color: '#121212'
-            }}>
-              DROP ALERTS BROADCAST
-            </h2>
-          </div>
-          <span style={{
-            fontSize: '10px',
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            padding: '2px 8px',
-            backgroundColor: '#121212',
-            color: '#FFFFFF',
-            borderRadius: '4px'
-          }}>
-            EMAIL
-          </span>
-        </div>
-        <p style={{ fontSize: '12px', color: '#71717A', marginTop: '4px', marginBottom: 0 }}>
-          Notify all drop-list subscribers instantly via BCC private broadcast.
-        </p>
-      </div>
-
-      {/* Status Messages */}
-      {broadcastStatus?.type === 'success' && (
-        <div style={{
-          padding: '12px 14px',
-          backgroundColor: '#F0FDF4',
-          border: '1px solid #86EFAC',
-          borderRadius: '6px',
-          color: '#15803D',
-          fontSize: '13px',
-          fontWeight: 700,
-          marginBottom: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
-          <span>{broadcastStatus.text}</span>
-        </div>
-      )}
-
-      {broadcastStatus?.type === 'error' && (
-        <div style={{
-          padding: '12px 14px',
-          backgroundColor: '#FEF2F2',
-          border: '1px solid #FCA5A5',
-          borderRadius: '6px',
-          color: '#B91C1C',
-          fontSize: '13px',
-          fontWeight: 600,
-          marginBottom: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
-          <span>{broadcastStatus.text}</span>
-        </div>
-      )}
-
-      {/* Broadcast Form */}
-      <form onSubmit={handleSendBroadcast} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        <div>
-          <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-            DROP ALERT SUBJECT *
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. DROP 04: ARCHIVAL TEES & HOODIES LIVE NOW"
-            value={broadcastSubject}
-            onChange={(e) => setBroadcastSubject(e.target.value)}
-            disabled={broadcastSending}
-            required
-            style={{
-              width: '100%',
-              minHeight: '44px',
-              padding: '10px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #D4D4D8',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: 600,
-              color: '#121212',
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-            MESSAGE CONTENT *
-          </label>
-          <textarea
-            rows={5}
-            placeholder="Enter announcement details for subscribers (e.g., release notes, 1-of-1 pieces available, direct link to shop)..."
-            value={broadcastMessage}
-            onChange={(e) => setBroadcastMessage(e.target.value)}
-            disabled={broadcastSending}
-            required
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #D4D4D8',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: 500,
-              color: '#121212',
-              boxSizing: 'border-box',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              lineHeight: 1.5
-            }}
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={broadcastSending}
-          style={{
-            width: '100%',
-            minHeight: '48px',
-            backgroundColor: broadcastSending ? '#71717A' : '#121212',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 800,
-            letterSpacing: '0.04em',
-            cursor: broadcastSending ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            marginTop: '4px',
-            transition: 'background-color 0.15s ease'
-          }}
-        >
-          {broadcastSending ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              <span>Sending...</span>
-            </>
-          ) : (
-            <>
-              <Send size={15} />
-              <span>SEND DROP ALERT</span>
-            </>
-          )}
-        </button>
-
-        <div style={{ fontSize: '11px', color: '#71717A', textAlign: 'center', marginTop: '2px' }}>
-          Broadcasts to all newsletter subscribers with hidden BCC headers
-        </div>
-      </form>
-    </div>
-  );
-
   // ========================================================
   // RENDER: LOADING CHECK
   // ========================================================
   if (authChecking) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: '#121212',
-        color: '#FFFFFF',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        overflowX: 'hidden'
-      }}>
-        <div style={{
-          width: '38px',
-          height: '38px',
-          border: '3px solid #27272A',
-          borderTopColor: '#FFFFFF',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-          marginBottom: '16px'
-        }} />
-        <p style={{
-          fontFamily: 'var(--font-heading)',
-          fontSize: '13px',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase'
-        }}>
-          VERIFYING ADMIN CREDENTIALS...
+      <div className="min-h-screen w-full bg-[#121212] text-white flex flex-col items-center justify-center p-6">
+        <div className="w-10 h-10 border-3 border-zinc-700 border-t-white rounded-full animate-spin mb-4" />
+        <p className="font-mono text-xs uppercase tracking-widest text-zinc-400">
+          Verifying Admin Credentials...
         </p>
       </div>
     );
@@ -897,70 +618,21 @@ export default function NikhilAdminDashboard({ onExit }) {
   // ========================================================
   if (!currentUser) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: '#09090B',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        overflowX: 'hidden',
-        boxSizing: 'border-box'
-      }}>
-        <div style={{
-          width: '100%',
-          maxWidth: '420px',
-          backgroundColor: '#121212',
-          border: '1px solid #27272A',
-          borderRadius: '8px',
-          padding: '32px 20px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              backgroundColor: '#18181B',
-              border: '1px solid #27272A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 14px'
-            }}>
-              <Lock size={22} color="#FFFFFF" />
-            </div>
-            <h1 style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: '18px',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              color: '#FFFFFF',
-              textTransform: 'uppercase'
-            }}>
-              CURATED // ADMIN
-            </h1>
-            <p style={{ fontSize: '12px', color: '#71717A', marginTop: '6px' }}>
-              Restricted to {REQUIRED_ADMIN_EMAIL}
-            </p>
+      <div className="min-h-screen w-full bg-[#09090B] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-[#121212] border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl text-center">
+          <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+            <Lock size={22} className="text-white" />
           </div>
+          <h1 className="font-extrabold text-lg tracking-wider text-white uppercase">
+            CURATED // ADMIN
+          </h1>
+          <p className="text-xs text-zinc-400 mt-1 mb-6">
+            Restricted strictly to {REQUIRED_ADMIN_EMAIL}
+          </p>
 
           {authError && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '6px',
-              color: '#EF4444',
-              fontSize: '12.5px',
-              marginBottom: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <AlertTriangle size={16} />
+            <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-lg text-red-400 text-xs mb-4 flex items-center gap-2">
+              <AlertTriangle size={16} className="shrink-0" />
               <span>{authError}</span>
             </div>
           )}
@@ -968,23 +640,7 @@ export default function NikhilAdminDashboard({ onExit }) {
           <button
             onClick={handleAdminGoogleLogin}
             disabled={isSigningIn}
-            style={{
-              width: '100%',
-              minHeight: '50px',
-              backgroundColor: '#FFFFFF',
-              color: '#121212',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '15px',
-              fontWeight: 800,
-              fontFamily: 'var(--font-btn)',
-              letterSpacing: '0.04em',
-              cursor: isSigningIn ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px'
-            }}
+            className="w-full min-h-[48px] bg-white text-zinc-900 font-bold text-sm tracking-wide rounded-lg flex items-center justify-center gap-3 cursor-pointer hover:bg-zinc-100 transition-colors disabled:opacity-60"
           >
             {isSigningIn ? (
               <span>VERIFYING...</span>
@@ -1007,87 +663,30 @@ export default function NikhilAdminDashboard({ onExit }) {
 
   // ========================================================
   // RENDER: MOBILE-FIRST ADMIN SUITE
+  // Fixed Bottom Bar with 4 tabs: Dashboard, Orders, Catalog, Drop Alerts
   // ========================================================
   return (
-    <div style={{
-      minHeight: '100vh',
-      width: '100%',
-      maxWidth: '100vw',
-      overflowX: 'hidden',
-      backgroundColor: '#F8F9FA',
-      color: '#121212',
-      boxSizing: 'border-box',
-      position: 'relative'
-    }}>
+    <div className="min-h-screen w-full bg-[#F8F9FA] text-[#121212] relative overflow-x-hidden">
       
-      {/* 1. Mobile Top Sticky Header */}
-      <header style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backgroundColor: '#121212',
-        color: '#FFFFFF',
-        borderBottom: '1px solid #27272A',
-        padding: '12px 16px',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px'
-        }}>
-          {/* Logo & Status Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <span style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: '15px',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              whiteSpace: 'nowrap'
-            }}>
+      {/* 1. Mobile Top Header */}
+      <header className="sticky top-0 z-40 bg-[#121212] text-white border-b border-zinc-800 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-sm sm:text-base tracking-wider uppercase">
               NIKHIL ADMIN
             </span>
-            <span style={{
-              backgroundColor: '#18181B',
-              border: '1px solid #27272A',
-              color: '#34A853',
-              fontSize: '10px',
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              whiteSpace: 'nowrap'
-            }}>
-              <ShieldCheck size={11} color="#34A853" /> SECURE
+            <span className="bg-zinc-900 border border-zinc-700 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+              <ShieldCheck size={11} className="text-emerald-400" /> SECURE
             </span>
           </div>
 
-          {/* Quick Header Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 if (onExit) onExit();
                 else window.location.href = '/';
               }}
-              aria-label="View Storefront"
-              style={{
-                backgroundColor: 'transparent',
-                border: '1px solid #3F3F46',
-                color: '#FFFFFF',
-                borderRadius: '4px',
-                padding: '6px 10px',
-                fontSize: '11px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
+              className="bg-transparent border border-zinc-700 hover:border-zinc-500 text-white rounded px-2.5 py-1 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <ExternalLink size={12} />
               <span>SHOP</span>
@@ -1095,414 +694,275 @@ export default function NikhilAdminDashboard({ onExit }) {
 
             <button
               onClick={handleAdminLogout}
-              aria-label="Log Out"
-              style={{
-                backgroundColor: '#EF4444',
-                border: 'none',
-                color: '#FFFFFF',
-                borderRadius: '4px',
-                padding: '6px 10px',
-                fontSize: '11px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
+              title="Sign Out"
+              className="bg-red-600 hover:bg-red-700 text-white rounded p-1.5 text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
             >
-              <LogOut size={12} />
+              <LogOut size={13} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* 2. Main Mobile Content Container */}
-      <main
-        className="pb-24"
-        style={{
-          width: '100%',
-          maxWidth: '100%',
-          paddingTop: '16px',
-          paddingLeft: '14px',
-          paddingRight: '14px',
-          paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 24px))',
-          boxSizing: 'border-box',
-          overflowX: 'hidden'
-        }}
-      >
+      {/* 2. Main Tab Content Container */}
+      <main className="w-full max-w-2xl mx-auto px-3.5 py-4 pb-28">
         
-        {/* Status Messages */}
+        {/* Global Notifications */}
         {actionError && (
-          <div style={{
-            padding: '12px 14px',
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FCA5A5',
-            borderRadius: '6px',
-            color: '#B91C1C',
-            fontSize: '13px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-semibold mb-3 flex items-center gap-2">
+            <AlertTriangle size={16} className="shrink-0 text-red-600" />
             <span>{actionError}</span>
           </div>
         )}
 
         {successMessage && (
-          <div style={{
-            padding: '12px 14px',
-            backgroundColor: '#F0FDF4',
-            border: '1px solid #86EFAC',
-            borderRadius: '6px',
-            color: '#15803D',
-            fontSize: '13px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold mb-3 flex items-center gap-2">
+            <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
             <span>{successMessage}</span>
           </div>
         )}
 
         {/* ========================================================
-            TAB 1: DASHBOARD (MOBILE REVENUE & STATS)
+            TAB 1: REAL-TIME DASHBOARD
         ======================================================== */}
         {activeTab === 'dashboard' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flex flex-col gap-4">
             
-            {/* Header with Title & Full-width Native Timeframe Picker */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div>
-                <h1 style={{
-                  fontSize: '18px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
-                  REAL-TIME OVERVIEW
-                </h1>
-                <p style={{ fontSize: '12px', color: '#71717A', marginTop: '2px', marginBottom: 0 }}>
-                  Logged in as {REQUIRED_ADMIN_EMAIL}
-                </p>
+            {/* Header & Timeframe Filter */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-base sm:text-lg font-extrabold uppercase tracking-wide">
+                    REAL-TIME OVERVIEW
+                  </h1>
+                  <p className="text-xs text-zinc-500">
+                    Supabase live data • {REQUIRED_ADMIN_EMAIL}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    fetchOrders();
+                    fetchCatalog();
+                  }}
+                  className="p-1.5 bg-white border border-zinc-300 rounded text-xs font-bold flex items-center gap-1 hover:bg-zinc-50 cursor-pointer"
+                  title="Refresh metrics"
+                >
+                  <RefreshCw size={13} className={loadingOrders || loadingProducts ? 'animate-spin' : ''} />
+                  <span>REFRESH</span>
+                </button>
               </div>
 
-              {/* Full-width Native Timeframe Picker for Mobile */}
-              <div style={{ width: '100%' }}>
-                <select
-                  value={revenueTimeframe}
-                  onChange={(e) => setRevenueTimeframe(e.target.value)}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    padding: '10px 14px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '6px',
-                    fontSize: '16px', // Prevents iOS Safari auto-zoom
-                    fontWeight: 700,
-                    color: '#121212',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <option value="day">Timeframe: Today (Last 24 Hours)</option>
-                  <option value="month">Timeframe: This Month (Last 30 Days)</option>
-                  <option value="year">Timeframe: This Year ({new Date().getFullYear()})</option>
-                  <option value="all">Timeframe: All Time</option>
-                </select>
+              {/* Timeframe Selector Pills */}
+              <div className="grid grid-cols-4 bg-zinc-200/80 p-1 rounded-lg gap-1">
+                {[
+                  { id: 'day', label: 'Day' },
+                  { id: 'month', label: 'Month' },
+                  { id: 'year', label: 'Year' },
+                  { id: 'all', label: 'All Time' }
+                ].map((tf) => (
+                  <button
+                    key={tf.id}
+                    onClick={() => handleTimeframeChange(tf.id)}
+                    className={`py-1.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                      revenueTimeframe === tf.id
+                        ? 'bg-[#121212] text-white shadow-sm'
+                        : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                    }`}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Total Revenue Widget (Full-Width Card) */}
-            <div style={{
-              backgroundColor: '#121212',
-              color: '#FFFFFF',
-              borderRadius: '8px',
-              padding: '20px 18px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              boxSizing: 'border-box',
-              width: '100%'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
-                  TOTAL REVENUE ({revenueTimeframe.toUpperCase()})
+            {/* Total Revenue Display Card */}
+            <div className="bg-[#121212] text-white rounded-xl p-5 shadow-lg border border-zinc-800">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-extrabold tracking-wider text-zinc-400 uppercase">
+                  REVENUE ({revenueTimeframe.toUpperCase()})
                 </span>
-                <TrendingUp size={18} color="#22C55E" />
+                <TrendingUp size={18} className="text-emerald-400" />
               </div>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 900,
-                color: '#FFFFFF',
-                fontFamily: 'var(--font-heading)',
-                letterSpacing: '0.02em',
-                lineHeight: 1.1
-              }}>
-                ₹{filteredRevenue.toLocaleString('en-IN')}
+              <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                ₹{revenue.toLocaleString('en-IN')}
               </div>
-              <p style={{ fontSize: '12px', color: '#A1A1AA', marginTop: '8px', marginBottom: 0 }}>
-                Income from packed &amp; confirmed customer orders
+              <p className="text-xs text-zinc-400 mt-2">
+                Calculated dynamically from {orders.length} orders in Supabase
               </p>
             </div>
 
-            {/* 2-Column Grid for PACKED & PENDING Stats */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '12px',
-              width: '100%'
-            }}>
+            {/* 2-Column Counts Grid: PACKED vs PENDING */}
+            <div className="grid grid-cols-2 gap-3">
               
-              {/* Packed Orders Counter */}
+              {/* Packed Orders Card */}
               <div
-                onClick={() => { setActiveTab('orders'); setOrderStatusFilter('PACKED'); }}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E4E4E7',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  cursor: 'pointer'
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderStatusFilter('PACKED');
                 }}
+                className="bg-white border border-zinc-200 rounded-xl p-4 shadow-xs cursor-pointer hover:border-emerald-300 transition-colors"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#71717A', letterSpacing: '0.06em' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
                     PACKED
                   </span>
-                  <CheckCircle2 size={16} color="#16A34A" />
+                  <CheckCircle2 size={16} className="text-emerald-600" />
                 </div>
-                <div style={{ fontSize: '30px', fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>
-                  {packedOrdersCount}
+                <div className="text-3xl font-black text-emerald-600">
+                  {packedCount}
                 </div>
-                <span style={{ fontSize: '11px', color: '#71717A', marginTop: '6px', display: 'block' }}>
-                  Orders Ready →
+                <span className="text-[11px] font-bold text-zinc-400 mt-1 block">
+                  Orders ready →
                 </span>
               </div>
 
-              {/* Pending Orders Counter */}
+              {/* Pending Orders Card */}
               <div
-                onClick={() => { setActiveTab('orders'); setOrderStatusFilter('PENDING'); }}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: pendingOrdersCount > 0 ? '1px solid #FCA5A5' : '1px solid #E4E4E7',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  cursor: 'pointer'
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderStatusFilter('PENDING');
                 }}
+                className={`bg-white rounded-xl p-4 shadow-xs cursor-pointer transition-colors ${
+                  pendingCount > 0
+                    ? 'border border-red-300 hover:border-red-400 bg-red-50/20'
+                    : 'border border-zinc-200 hover:border-zinc-300'
+                }`}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: pendingOrdersCount > 0 ? '#DC2626' : '#71717A', letterSpacing: '0.06em' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-extrabold uppercase tracking-wider ${
+                    pendingCount > 0 ? 'text-red-600' : 'text-zinc-500'
+                  }`}>
                     PENDING
                   </span>
-                  <Clock size={16} color={pendingOrdersCount > 0 ? '#DC2626' : '#71717A'} />
+                  <Clock size={16} className={pendingCount > 0 ? 'text-red-600' : 'text-zinc-400'} />
                 </div>
-                <div style={{ fontSize: '30px', fontWeight: 900, color: pendingOrdersCount > 0 ? '#DC2626' : '#121212', lineHeight: 1 }}>
-                  {pendingOrdersCount}
+                <div className={`text-3xl font-black ${pendingCount > 0 ? 'text-red-600' : 'text-zinc-900'}`}>
+                  {pendingCount}
                 </div>
-                <span style={{ fontSize: '11px', color: pendingOrdersCount > 0 ? '#DC2626' : '#71717A', marginTop: '6px', display: 'block', fontWeight: pendingOrdersCount > 0 ? 700 : 400 }}>
-                  Needs Packing →
+                <span className={`text-[11px] font-bold mt-1 block ${
+                  pendingCount > 0 ? 'text-red-600' : 'text-zinc-400'
+                }`}>
+                  Needs packing →
                 </span>
               </div>
 
             </div>
 
-            {/* Catalog Pieces Summary Card */}
+            {/* Catalog Count Summary Card */}
             <div
               onClick={() => setActiveTab('catalog')}
-              style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E4E4E7',
-                borderRadius: '8px',
-                padding: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer'
-              }}
+              className="bg-white border border-zinc-200 rounded-xl p-4 shadow-xs flex items-center justify-between cursor-pointer hover:border-zinc-400 transition-colors"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ padding: '8px', backgroundColor: '#F4F4F5', borderRadius: '6px' }}>
-                  <Package size={20} color="#121212" />
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-zinc-100 rounded-lg text-zinc-800">
+                  <Package size={20} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#121212' }}>
-                    {products.length} Active Catalog Pieces
+                  <div className="text-sm font-black text-zinc-900">
+                    {catalogCount} Active Catalog Pieces
                   </div>
-                  <div style={{ fontSize: '11.5px', color: '#71717A' }}>
-                    1-of-1 archival streetwear in stock
+                  <div className="text-xs text-zinc-500">
+                    1-of-1 archival streetwear in Supabase
                   </div>
                 </div>
               </div>
-              <ChevronRight size={18} color="#A1A1AA" />
+              <ChevronRight size={18} className="text-zinc-400" />
             </div>
 
-            {/* Quick Action Button: Add New Piece */}
-            <button
-              onClick={() => setActiveTab('catalog')}
-              style={{
-                width: '100%',
-                minHeight: '50px',
-                backgroundColor: '#121212',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 800,
-                letterSpacing: '0.04em',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              <PlusCircle size={18} />
-              <span>SNAP &amp; PUBLISH NEW PIECE</span>
-            </button>
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                onClick={() => setActiveTab('catalog')}
+                className="min-h-[46px] bg-[#121212] text-white rounded-lg text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors"
+              >
+                <PlusCircle size={15} />
+                <span>ADD PRODUCT</span>
+              </button>
 
-            {/* Drop Alerts Broadcast Card */}
-            {renderDropAlertsBroadcastCard()}
+              <button
+                onClick={() => setActiveTab('drop-alerts')}
+                className="min-h-[46px] bg-white border border-zinc-300 text-zinc-900 rounded-lg text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-50 transition-colors"
+              >
+                <Bell size={15} />
+                <span>SEND DROP ALERT</span>
+              </button>
+            </div>
 
           </div>
         )}
 
         {/* ========================================================
-            TAB 2: ORDERS (STACKED MOBILE CARDS + IOS TOGGLE)
+            TAB 2: ORDERS TAB (STACKED CARDS + DIGITAL RECEIPT MODAL)
         ======================================================== */}
         {activeTab === 'orders' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="flex flex-col gap-3.5">
             
-            {/* Orders Header & Refresh */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Header & Controls */}
+            <div className="flex items-center justify-between">
               <div>
-                <h1 style={{
-                  fontSize: '18px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
+                <h1 className="text-base sm:text-lg font-extrabold uppercase tracking-wide">
                   ORDERS ({orders.length})
                 </h1>
-                <p style={{ fontSize: '12px', color: '#71717A', margin: '2px 0 0 0' }}>
-                  Tap switch to toggle Packed status
+                <p className="text-xs text-zinc-500">
+                  Tap card for receipt • Toggle switch for Packed status
                 </p>
               </div>
 
               <button
-                onClick={fetchOrders}
+                onClick={() => fetchOrders()}
                 disabled={loadingOrders}
-                style={{
-                  minHeight: '40px',
-                  padding: '6px 12px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D4D4D8',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer'
-                }}
+                className="px-3 py-1.5 bg-white border border-zinc-300 rounded text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-zinc-50"
               >
                 <RefreshCw size={13} className={loadingOrders ? 'animate-spin' : ''} />
                 <span>REFRESH</span>
               </button>
             </div>
 
-            {/* Search Box with 16px font-size to prevent zoom */}
-            <div style={{ position: 'relative', width: '100%' }}>
-              <Search size={18} color="#71717A" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+            {/* Search Input */}
+            <div className="relative w-full">
+              <Search size={16} className="absolute left-3 top-3 text-zinc-400" />
               <input
                 type="text"
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Search orders, customers..."
-                style={{
-                  width: '100%',
-                  minHeight: '44px',
-                  padding: '10px 12px 10px 38px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D4D4D8',
-                  borderRadius: '6px',
-                  fontSize: '16px', // Prevents iOS Safari auto-zoom
-                  boxSizing: 'border-box'
-                }}
+                placeholder="Search orders by number, customer, email..."
+                className="w-full min-h-[42px] bg-white border border-zinc-300 rounded-lg pl-9 pr-3 text-base text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-800"
               />
             </div>
 
-            {/* Segmented Filter Pills */}
-            <div style={{
-              display: 'flex',
-              width: '100%',
-              backgroundColor: '#E4E4E7',
-              borderRadius: '6px',
-              padding: '3px',
-              boxSizing: 'border-box'
-            }}>
+            {/* Filter Pills */}
+            <div className="grid grid-cols-3 bg-zinc-200/80 p-1 rounded-lg gap-1">
               {['ALL', 'PENDING', 'PACKED'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setOrderStatusFilter(filter)}
-                  style={{
-                    flex: 1,
-                    minHeight: '36px',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    letterSpacing: '0.04em',
-                    backgroundColor: orderStatusFilter === filter ? '#121212' : 'transparent',
-                    color: orderStatusFilter === filter ? '#FFFFFF' : '#52525B',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
+                  className={`py-1.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                    orderStatusFilter === filter
+                      ? 'bg-[#121212] text-white shadow-sm'
+                      : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                  }`}
                 >
                   {filter}
                 </button>
               ))}
             </div>
 
-            {/* Orders Stacked Cards List */}
+            {/* Stacked Mobile Order Cards */}
             {loadingOrders ? (
-              <div style={{ padding: '60px 20px', textAlign: 'center', color: '#71717A' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  border: '2px solid #D4D4D8',
-                  borderTopColor: '#121212',
-                  borderRadius: '50%',
-                  margin: '0 auto 12px',
-                  animation: 'spin 0.8s linear infinite'
-                }} />
-                Loading orders...
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                <Loader2 size={24} className="animate-spin mx-auto mb-2 text-zinc-600" />
+                Loading orders from Supabase...
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E4E4E7',
-                borderRadius: '8px',
-                padding: '40px 16px',
-                textAlign: 'center',
-                color: '#71717A'
-              }}>
-                <ShoppingBag size={32} color="#D4D4D8" style={{ margin: '0 auto 10px' }} />
-                <p style={{ fontSize: '14px', fontWeight: 700, color: '#121212', marginBottom: '4px' }}>
-                  No matching orders
-                </p>
-                <p style={{ fontSize: '12px', margin: 0 }}>
-                  Orders placed by customers will appear here.
+              <div className="bg-white border border-zinc-200 rounded-xl p-8 text-center text-zinc-500">
+                <ShoppingBag size={32} className="mx-auto mb-2 text-zinc-300" />
+                <p className="font-bold text-sm text-zinc-900">No orders found</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Customer orders will appear here in real-time.
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="flex flex-col gap-3">
                 {filteredOrders.map((order) => {
                   const isPacked = (order.status || '').toUpperCase() === 'PACKED';
                   const isUpdating = updatingOrderId === order.id;
@@ -1513,113 +973,94 @@ export default function NikhilAdminDashboard({ onExit }) {
                     minute: '2-digit'
                   }) : 'N/A';
 
+                  const firstItem = order.items?.[0];
+                  const itemImg = order.product_image_url || firstItem?.image || firstItem?.image_url || firstItem?.images?.[0];
+
                   return (
                     <div
                       key={order.id}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        border: isPacked ? '1px solid #BBF7D0' : '1px solid #E4E4E7',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        boxSizing: 'border-box'
-                      }}
+                      onClick={() => setSelectedOrder(order)}
+                      className={`bg-white border rounded-xl p-4 shadow-xs flex flex-col gap-3 cursor-pointer hover:shadow-md transition-all ${
+                        isPacked ? 'border-emerald-300 bg-emerald-50/10' : 'border-zinc-200'
+                      }`}
                     >
                       {/* Top Row: Order ID & Date */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{
-                          fontFamily: 'monospace',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          backgroundColor: '#F4F4F5',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          color: '#121212'
-                        }}>
-                          #{order.order_number || order.id.slice(0, 10)}
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold bg-zinc-100 text-zinc-800 px-2.5 py-1 rounded">
+                          #{order.order_number || order.id.slice(0, 8)}
                         </span>
-
-                        <span style={{ fontSize: '11.5px', color: '#71717A', fontWeight: 600 }}>
+                        <span className="text-xs font-medium text-zinc-500">
                           {dateStr}
                         </span>
                       </div>
 
-                      {/* Middle Row: Customer Info & Amount */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ minWidth: 0, paddingRight: '8px' }}>
-                          <div style={{ fontSize: '15px', fontWeight: 800, color: '#121212' }}>
-                            {order.customer_name || 'Customer'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#71717A', marginTop: '2px', wordBreak: 'break-all' }}>
-                            {order.customer_email || 'No email provided'}
-                          </div>
-                          {order.items?.length > 0 && (
-                            <div style={{ fontSize: '11.5px', color: '#52525B', marginTop: '4px' }}>
-                              {order.items[0]?.name}
+                      {/* Middle Row: Customer Details & Total */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          {itemImg ? (
+                            <img
+                              src={itemImg}
+                              alt="Garment"
+                              className="w-12 h-14 object-cover rounded bg-zinc-100 shrink-0 border border-zinc-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-14 rounded bg-zinc-100 flex items-center justify-center shrink-0 text-zinc-400 border border-zinc-200">
+                              <Package size={18} />
                             </div>
                           )}
+
+                          <div className="min-w-0">
+                            <div className="font-bold text-sm text-zinc-900 truncate">
+                              {order.customer_name || 'Customer'}
+                            </div>
+                            <div className="text-xs text-zinc-500 truncate mt-0.5">
+                              {order.customer_email || 'No email'}
+                            </div>
+                            {firstItem?.name && (
+                              <div className="text-[11px] text-zinc-600 truncate mt-1">
+                                {firstItem.name} {order.items?.length > 1 ? `(+${order.items.length - 1} more)` : ''}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div style={{
-                          fontSize: '18px',
-                          fontWeight: 900,
-                          color: '#121212',
-                          fontFamily: 'var(--font-heading)',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          ₹{(parseFloat(order.total_amount) || 0).toLocaleString('en-IN')}
+                        <div className="text-right shrink-0">
+                          <div className="font-black text-base text-zinc-900">
+                            ₹{(parseFloat(order.total_amount) || 0).toLocaleString('en-IN')}
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                            {order.payment_status || 'PAID'}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Bottom Row: iOS-Style 'Packed' Toggle Switch (Min tap target 44px) */}
+                      {/* Bottom Row: iOS Toggle Switch with e.stopPropagation() */}
                       <div
-                        onClick={() => !isUpdating && handleTogglePacked(order)}
-                        style={{
-                          minHeight: '44px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          backgroundColor: isPacked ? '#F0FDF4' : '#F4F4F5',
-                          border: isPacked ? '1px solid #86EFAC' : '1px solid #E4E4E7',
-                          cursor: isUpdating ? 'wait' : 'pointer',
-                          userSelect: 'none'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isUpdating) handleTogglePacked(order, e);
                         }}
+                        className={`min-h-[44px] flex items-center justify-between px-3 py-2 rounded-lg border transition-colors cursor-pointer select-none ${
+                          isPacked
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-zinc-100 border-zinc-200 text-zinc-600'
+                        }`}
                       >
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: 800,
-                          letterSpacing: '0.04em',
-                          color: isPacked ? '#15803D' : '#52525B'
-                        }}>
+                        <span className="text-xs font-bold uppercase tracking-wide">
                           {isPacked ? 'STATUS: PACKED ✓' : 'STATUS: PENDING PACKING'}
                         </span>
 
-                        {/* Large Touch-Friendly iOS Toggle Switch */}
-                        <div style={{
-                          width: '52px',
-                          height: '30px',
-                          borderRadius: '15px',
-                          backgroundColor: isPacked ? '#16A34A' : '#D4D4D8',
-                          position: 'relative',
-                          transition: 'background-color 0.25s ease',
-                          flexShrink: 0
-                        }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: '#FFFFFF',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
-                            position: 'absolute',
-                            top: '3px',
-                            left: isPacked ? '25px' : '3px',
-                            transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }} />
+                        {/* iOS-Style Toggle Switch */}
+                        <div
+                          className={`w-12 h-7 rounded-full relative transition-colors duration-200 shrink-0 ${
+                            isPacked ? 'bg-emerald-600' : 'bg-zinc-300'
+                          }`}
+                        >
+                          <div
+                            className={`w-5.5 h-5.5 rounded-full bg-white shadow-md absolute top-0.75 transition-all duration-200 ${
+                              isPacked ? 'left-5.5' : 'left-0.75'
+                            }`}
+                          />
                         </div>
                       </div>
 
@@ -1633,143 +1074,93 @@ export default function NikhilAdminDashboard({ onExit }) {
         )}
 
         {/* ========================================================
-            TAB 3: CATALOG (SINGLE-COLUMN QUICK ENTRY + MOBILE LIST)
+            TAB 3: CATALOG TAB (QUICK PRODUCT ENTRY & DELETION)
         ======================================================== */}
         {activeTab === 'catalog' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="flex flex-col gap-5">
             
-            {/* 1. Quick Mobile Product Entry (Single-Column Form) */}
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E4E4E7',
-              borderRadius: '8px',
-              padding: '18px 16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #E4E4E7', paddingBottom: '12px' }}>
-                <PlusCircle size={20} color="#121212" />
-                <h2 style={{
-                  fontSize: '15px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
+            {/* 1. Quick Mobile Product Entry Form */}
+            <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 mb-4 border-b border-zinc-200">
+                <PlusCircle size={18} className="text-zinc-900" />
+                <h2 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
                   QUICK MOBILE PRODUCT ENTRY
                 </h2>
               </div>
 
-              <form onSubmit={handleAddProduct} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <form onSubmit={handleAddProduct} className="flex flex-col gap-3.5">
                 
-                {/* 100% Width Tall Photo Tap Button (Min height 52px) */}
+                {/* Image Upload Area: No capture attribute so native camera/gallery selection appears */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '6px' }}>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1.5 uppercase">
                     PRODUCT IMAGE *
                   </label>
+                  
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      width: '100%',
-                      minHeight: '160px',
-                      border: '2px dashed #D4D4D8',
-                      borderRadius: '6px',
-                      backgroundColor: '#FAFAFA',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '16px',
-                      cursor: 'pointer',
-                      boxSizing: 'border-box'
-                    }}
+                    className="w-full min-h-[160px] border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-lg bg-zinc-50 flex flex-col items-center justify-center p-4 cursor-pointer transition-colors"
                   >
                     {imagePreview ? (
-                      <div style={{ position: 'relative', width: '100%', height: '180px' }}>
+                      <div className="relative w-full h-44">
                         <img
                           src={imagePreview}
-                          alt="Preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          alt="Product Preview"
+                          className="w-full h-full object-contain rounded"
                         />
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 4,
-                          right: 4,
-                          backgroundColor: 'rgba(0,0,0,0.8)',
-                          color: '#FFFFFF',
-                          padding: '4px 8px',
-                          fontSize: '11px',
-                          borderRadius: '4px'
-                        }}>
-                          TAP TO RETAKE
+                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded">
+                          TAP TO CHANGE
                         </div>
                       </div>
                     ) : (
                       <>
-                        <Camera size={34} color="#71717A" style={{ marginBottom: '8px' }} />
-                        <span style={{ fontSize: '14px', fontWeight: 800, color: '#121212' }}>
-                          SNAP OR SELECT PHOTO
+                        <Camera size={32} className="text-zinc-400 mb-2" />
+                        <span className="text-sm font-bold text-zinc-800">
+                          TAP TO SNAP OR CHOOSE PHOTO
                         </span>
-                        <span style={{ fontSize: '11px', color: '#71717A', marginTop: '2px' }}>
-                          Uploads directly to product-images
+                        <span className="text-[11px] text-zinc-500 mt-1">
+                          Selects from Camera or Photo Library (Max 50MB)
                         </span>
                       </>
                     )}
                   </div>
 
+                  {/* Standard file input without capture attribute */}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    style={{ display: 'none' }}
+                    className="hidden"
                   />
                 </div>
 
-                {/* Garment Title (font-size: 16px to prevent iOS zoom) */}
+                {/* Title */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-                    TITLE / GARMENT NAME *
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                    GARMENT TITLE *
                   </label>
                   <input
-                    name="title"
                     type="text"
+                    name="title"
                     required
-                    value={form.title}
-                    onChange={handleFormChange}
+                    value={productForm.title}
+                    onChange={handleProductFormChange}
                     placeholder="e.g. Heavyweight Mineral Washed Boxy Tee"
-                    style={{
-                      width: '100%',
-                      minHeight: '44px',
-                      padding: '10px 12px',
-                      border: '1px solid #D4D4D8',
-                      borderRadius: '6px',
-                      fontSize: '16px', // 16px prevents iOS zoom
-                      boxSizing: 'border-box'
-                    }}
+                    className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                   />
                 </div>
 
-                {/* Category & Condition Grade (Stacked / Full Width) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Category & Condition Grade */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
                       CATEGORY *
                     </label>
                     <select
                       name="category"
-                      value={form.category}
-                      onChange={handleFormChange}
-                      style={{
-                        width: '100%',
-                        minHeight: '44px',
-                        padding: '10px 12px',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: '#FFFFFF',
-                        boxSizing: 'border-box'
-                      }}
+                      value={productForm.category}
+                      onChange={handleProductFormChange}
+                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                     >
                       <option value="t-shirts">T-Shirts</option>
                       <option value="shirts">Shirts</option>
@@ -1781,23 +1172,14 @@ export default function NikhilAdminDashboard({ onExit }) {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
                       CONDITION GRADE *
                     </label>
                     <select
                       name="conditionGrade"
-                      value={form.conditionGrade}
-                      onChange={handleFormChange}
-                      style={{
-                        width: '100%',
-                        minHeight: '44px',
-                        padding: '10px 12px',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: '#FFFFFF',
-                        boxSizing: 'border-box'
-                      }}
+                      value={productForm.conditionGrade}
+                      onChange={handleProductFormChange}
+                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                     >
                       <option value="New / Unused">New / Unused</option>
                       <option value="Pristine">Pristine</option>
@@ -1808,132 +1190,108 @@ export default function NikhilAdminDashboard({ onExit }) {
                   </div>
                 </div>
 
-                {/* Pricing Fields (2-column on mobile) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {/* Selling Price & Original Price */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
                       SELLING PRICE (₹) *
                     </label>
                     <input
-                      name="sellingPrice"
                       type="number"
+                      name="sellingPrice"
                       required
                       min="1"
-                      value={form.sellingPrice}
-                      onChange={handleFormChange}
+                      value={productForm.sellingPrice}
+                      onChange={handleProductFormChange}
                       placeholder="1599"
-                      style={{
-                        width: '100%',
-                        minHeight: '44px',
-                        padding: '10px',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        boxSizing: 'border-box'
-                      }}
+                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 800, color: '#71717A', display: 'block', marginBottom: '4px' }}>
+                    <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase">
                       ORIGINAL PRICE (₹)
                     </label>
                     <input
-                      name="originalPrice"
                       type="number"
+                      name="originalPrice"
                       min="1"
-                      value={form.originalPrice}
-                      onChange={handleFormChange}
-                      placeholder="3299"
-                      style={{
-                        width: '100%',
-                        minHeight: '44px',
-                        padding: '10px',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        boxSizing: 'border-box'
-                      }}
+                      value={productForm.originalPrice}
+                      onChange={handleProductFormChange}
+                      placeholder="2999"
+                      className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                     />
                   </div>
                 </div>
 
                 {/* Delivery Charge */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 800, color: '#71717A', display: 'block', marginBottom: '4px' }}>
+                  <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase">
                     DELIVERY CHARGE (₹)
                   </label>
                   <input
-                    name="deliveryCharge"
                     type="number"
+                    name="deliveryCharge"
                     min="0"
-                    value={form.deliveryCharge}
-                    onChange={handleFormChange}
+                    value={productForm.deliveryCharge}
+                    onChange={handleProductFormChange}
                     placeholder="0"
-                    style={{
-                      width: '100%',
-                      minHeight: '44px',
-                      padding: '10px',
-                      border: '1px solid #D4D4D8',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      boxSizing: 'border-box'
-                    }}
+                    className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                   />
                 </div>
 
-                {/* Measurements (4 items in a 2x2 grid) */}
+                {/* Measurements Grid (2x2) */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '6px' }}>
-                    PHYSICAL MEASUREMENTS (INCHES)
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                    MEASUREMENTS (INCHES)
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <span style={{ fontSize: '11px', color: '#71717A', display: 'block', marginBottom: '2px' }}>Chest</span>
+                      <span className="text-[11px] text-zinc-500">Chest</span>
                       <input
+                        type="number"
+                        step="0.5"
                         name="chest"
-                        type="number"
-                        step="0.5"
-                        value={form.chest}
-                        onChange={handleFormChange}
-                        placeholder="48"
-                        style={{ width: '100%', minHeight: '40px', padding: '8px', border: '1px solid #D4D4D8', borderRadius: '4px', fontSize: '16px', boxSizing: 'border-box' }}
+                        value={productForm.chest}
+                        onChange={handleProductFormChange}
+                        placeholder="46"
+                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
                       />
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', color: '#71717A', display: 'block', marginBottom: '2px' }}>Length</span>
+                      <span className="text-[11px] text-zinc-500">Length</span>
                       <input
+                        type="number"
+                        step="0.5"
                         name="length"
-                        type="number"
-                        step="0.5"
-                        value={form.length}
-                        onChange={handleFormChange}
+                        value={productForm.length}
+                        onChange={handleProductFormChange}
                         placeholder="29"
-                        style={{ width: '100%', minHeight: '40px', padding: '8px', border: '1px solid #D4D4D8', borderRadius: '4px', fontSize: '16px', boxSizing: 'border-box' }}
+                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
                       />
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', color: '#71717A', display: 'block', marginBottom: '2px' }}>Shoulder</span>
+                      <span className="text-[11px] text-zinc-500">Shoulder</span>
                       <input
+                        type="number"
+                        step="0.5"
                         name="shoulder"
-                        type="number"
-                        step="0.5"
-                        value={form.shoulder}
-                        onChange={handleFormChange}
-                        placeholder="22"
-                        style={{ width: '100%', minHeight: '40px', padding: '8px', border: '1px solid #D4D4D8', borderRadius: '4px', fontSize: '16px', boxSizing: 'border-box' }}
+                        value={productForm.shoulder}
+                        onChange={handleProductFormChange}
+                        placeholder="21"
+                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
                       />
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', color: '#71717A', display: 'block', marginBottom: '2px' }}>Sleeve</span>
+                      <span className="text-[11px] text-zinc-500">Sleeve</span>
                       <input
-                        name="sleeve"
                         type="number"
                         step="0.5"
-                        value={form.sleeve}
-                        onChange={handleFormChange}
-                        placeholder="25"
-                        style={{ width: '100%', minHeight: '40px', padding: '8px', border: '1px solid #D4D4D8', borderRadius: '4px', fontSize: '16px', boxSizing: 'border-box' }}
+                        name="sleeve"
+                        value={productForm.sleeve}
+                        onChange={handleProductFormChange}
+                        placeholder="10"
+                        className="w-full min-h-[38px] bg-white border border-zinc-300 rounded px-2.5 text-base text-zinc-900"
                       />
                     </div>
                   </div>
@@ -1941,102 +1299,52 @@ export default function NikhilAdminDashboard({ onExit }) {
 
                 {/* Condition Notes */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
                     CONDITION NOTES
                   </label>
                   <textarea
-                    name="conditionNotes"
                     rows={2}
-                    value={form.conditionNotes}
-                    onChange={handleFormChange}
-                    placeholder="e.g. Crisp collar ribbing, unworn sample condition."
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #D4D4D8',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      boxSizing: 'border-box'
-                    }}
+                    name="conditionNotes"
+                    value={productForm.conditionNotes}
+                    onChange={handleProductFormChange}
+                    placeholder="Flawless archival piece, heavy collar ribbing."
+                    className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:border-zinc-800"
                   />
                 </div>
 
-                {/* Submit Button (Tall 52px thumb target) */}
+                {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={submitting}
-                  style={{
-                    width: '100%',
-                    minHeight: '52px',
-                    fontSize: '14px',
-                    fontWeight: 800,
-                    letterSpacing: '0.04em',
-                    backgroundColor: '#121212',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    marginTop: '6px'
-                  }}
+                  disabled={submittingProduct}
+                  className="w-full min-h-[50px] bg-[#121212] text-white rounded-lg text-sm font-extrabold tracking-wide uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60"
                 >
-                  {submitting ? (
-                    <span>UPLOADING TO SUPABASE...</span>
+                  {submittingProduct ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>UPLOADING TO SUPABASE...</span>
+                    </>
                   ) : (
                     <>
-                      <PlusCircle size={18} />
+                      <PlusCircle size={17} />
                       <span>PUBLISH 1-OF-1 PIECE</span>
                     </>
                   )}
                 </button>
+
               </form>
             </div>
 
-            {/* 2. Existing Catalog List (Compact Mobile List Items) */}
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E4E4E7',
-              borderRadius: '8px',
-              padding: '18px 16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '14px',
-                borderBottom: '1px solid #E4E4E7',
-                paddingBottom: '10px'
-              }}>
-                <h2 style={{
-                  fontSize: '15px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
-                  CATALOG PIECES ({products.length})
+            {/* 2. Existing Catalog List & Deletion */}
+            <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200">
+                <h2 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
+                  EXISTING PRODUCTS ({products.length})
                 </h2>
 
                 <button
                   onClick={fetchCatalog}
                   disabled={loadingProducts}
-                  style={{
-                    padding: '6px 10px',
-                    backgroundColor: '#F4F4F5',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
+                  className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw size={12} className={loadingProducts ? 'animate-spin' : ''} />
                   <span>REFRESH</span>
@@ -2044,115 +1352,58 @@ export default function NikhilAdminDashboard({ onExit }) {
               </div>
 
               {loadingProducts ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#71717A', fontSize: '13px' }}>
-                  Loading catalog...
+                <div className="py-8 text-center text-xs text-zinc-500">
+                  <Loader2 size={20} className="animate-spin mx-auto mb-2 text-zinc-500" />
+                  Loading products from Supabase...
                 </div>
               ) : products.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#71717A', fontSize: '13px' }}>
-                  No catalog items found.
+                <div className="py-8 text-center text-xs text-zinc-500">
+                  No products in Supabase catalog yet.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="flex flex-col gap-2.5">
                   {products.map((item) => {
                     const img = Array.isArray(item.images)
                       ? (item.images[0] || item.image_url)
                       : (item.images || item.image_url || '');
-                    const price = item.selling_price || 0;
 
                     return (
                       <div
                         key={item.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px',
-                          border: '1px solid #E4E4E7',
-                          borderRadius: '6px',
-                          backgroundColor: '#FFFFFF',
-                          gap: '10px'
-                        }}
+                        className="flex items-center justify-between p-2.5 border border-zinc-200 rounded-lg bg-white gap-3 hover:border-zinc-300 transition-colors"
                       >
-                        {/* Thumbnail on left */}
                         {img ? (
                           <img
                             src={img}
                             alt={item.name}
-                            style={{
-                              width: '56px',
-                              height: '70px',
-                              objectFit: 'cover',
-                              borderRadius: '4px',
-                              backgroundColor: '#F4F4F5',
-                              flexShrink: 0
-                            }}
+                            className="w-14 h-18 object-cover rounded bg-zinc-100 shrink-0 border border-zinc-200"
                           />
                         ) : (
-                          <div
-                            style={{
-                              width: '56px',
-                              height: '70px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: '4px',
-                              backgroundColor: '#F4F4F5',
-                              color: '#A1A1AA',
-                              flexShrink: 0
-                            }}
-                          >
-                            <Package size={20} />
+                          <div className="w-14 h-18 rounded bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 border border-zinc-200">
+                            <Package size={18} />
                           </div>
                         )}
 
-                        {/* Title & Price in middle */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#71717A' }}>
-                            {item.sku || item.id}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                            {item.sku || item.category_id}
                           </span>
-                          <div style={{
-                            fontSize: '13px',
-                            fontWeight: 800,
-                            color: '#121212',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            marginTop: '2px'
-                          }}>
+                          <div className="text-xs font-bold text-zinc-900 truncate mt-0.5">
                             {item.name}
                           </div>
-                          <div style={{ fontSize: '13px', fontWeight: 900, color: '#121212', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>₹{price}</span>
-                            {(() => {
-                              const d = parseFloat(item.delivery_charge ?? item.deliveryCharge ?? item.cost_price ?? item.measurements?.delivery_charge) || 0;
-                              return d > 0 ? (
-                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#71717A' }}>
-                                  (+₹{d} del)
-                                </span>
-                              ) : null;
-                            })()}
+                          <div className="text-xs font-black text-zinc-900 mt-1">
+                            ₹{(parseFloat(item.selling_price) || 0).toLocaleString('en-IN')}
                           </div>
                         </div>
 
-                        {/* Large Red Delete Button (Min 44x44px tap target) */}
+                        {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteProduct(item)}
+                          title="Delete piece from Supabase"
                           aria-label={`Delete ${item.name}`}
-                          style={{
-                            minWidth: '44px',
-                            minHeight: '44px',
-                            backgroundColor: '#FEE2E2',
-                            color: '#DC2626',
-                            border: '1px solid #FCA5A5',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            flexShrink: 0
-                          }}
+                          className="min-w-[42px] min-h-[42px] bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-lg flex items-center justify-center cursor-pointer transition-colors shrink-0"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     );
@@ -2165,337 +1416,388 @@ export default function NikhilAdminDashboard({ onExit }) {
         )}
 
         {/* ========================================================
-            TAB 4: SETTINGS (MOBILE STORE CONFIGURATION & DROP ALERTS)
+            TAB 4: DROP ALERTS TAB (BROADCAST BLAST)
         ======================================================== */}
-        {activeTab === 'settings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Drop Alerts Broadcast Card */}
-            {renderDropAlertsBroadcastCard()}
-
-            {/* Store Configuration Card */}
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E4E4E7',
-              borderRadius: '8px',
-              padding: '18px 16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-            }}>
-            <div style={{ borderBottom: '1px solid #E4E4E7', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={20} color="#121212" />
-                <h1 style={{
-                  fontSize: '16px',
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  margin: 0
-                }}>
-                  STORE CONFIGURATION
+        {activeTab === 'drop-alerts' && (
+          <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <Bell size={18} className="text-zinc-900" />
+                <h1 className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-zinc-900">
+                  DROP ALERTS BROADCAST
                 </h1>
               </div>
-              <p style={{ fontSize: '12px', color: '#71717A', marginTop: '2px', marginBottom: 0 }}>
-                Adjust shipping rates and cart reservation duration
-              </p>
+              <span className="text-[10px] font-black tracking-wider bg-zinc-900 text-white px-2 py-0.5 rounded uppercase">
+                BCC BLAST
+              </span>
             </div>
 
-            {settingsSaved && (
-              <div style={{
-                padding: '12px',
-                backgroundColor: '#F0FDF4',
-                border: '1px solid #86EFAC',
-                borderRadius: '6px',
-                color: '#15803D',
-                fontSize: '13px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <CheckCircle2 size={16} />
-                <span>Configuration saved successfully.</span>
+            <p className="text-xs text-zinc-500 mb-4">
+              Blast private notification emails to all drop-list subscribers stored in Supabase.
+            </p>
+
+            {/* Status Feedback */}
+            {broadcastStatus?.type === 'success' && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-800 text-xs font-bold mb-4 flex items-center gap-2">
+                <CheckCircle2 size={17} className="shrink-0 text-emerald-600" />
+                <span>{broadcastStatus.text}</span>
               </div>
             )}
 
-            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {broadcastStatus?.type === 'error' && (
+              <div className="p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-xs font-semibold mb-4 flex items-center gap-2">
+                <AlertTriangle size={17} className="shrink-0 text-red-600" />
+                <span>{broadcastStatus.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSendBroadcast} className="flex flex-col gap-3.5">
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-                  FREE SHIPPING THRESHOLD (₹)
+                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                  DROP ALERT SUBJECT *
                 </label>
                 <input
-                  type="number"
-                  value={settings.shipping_free_threshold}
-                  onChange={(e) => setSettings({ ...settings, shipping_free_threshold: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    padding: '10px 12px',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    boxSizing: 'border-box'
-                  }}
+                  type="text"
+                  required
+                  value={broadcastSubject}
+                  onChange={(e) => setBroadcastSubject(e.target.value)}
+                  disabled={broadcastSending}
+                  placeholder="e.g. DROP 05: ARCHIVAL HEAVYWEIGHT PIECES ARE LIVE"
+                  className="w-full min-h-[44px] bg-white border border-zinc-300 rounded-lg px-3 text-base text-zinc-900 focus:outline-none focus:border-zinc-800 disabled:bg-zinc-100"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-                  FLAT DELIVERY FEE (₹)
+                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase">
+                  MESSAGE CONTENT *
                 </label>
-                <input
-                  type="number"
-                  value={settings.shipping_flat_rate}
-                  onChange={(e) => setSettings({ ...settings, shipping_flat_rate: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    padding: '10px 12px',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-                  CART HOLD TIMEOUT (MINUTES)
-                </label>
-                <input
-                  type="number"
-                  value={settings.cart_hold_duration_minutes}
-                  onChange={(e) => setSettings({ ...settings, cart_hold_duration_minutes: parseInt(e.target.value) || 10 })}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    padding: '10px 12px',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 800, color: '#121212', display: 'block', marginBottom: '4px' }}>
-                  CONCIERGE SUPPORT EMAIL
-                </label>
-                <input
-                  type="email"
-                  value={settings.concierge_email}
-                  onChange={(e) => setSettings({ ...settings, concierge_email: e.target.value })}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    padding: '10px 12px',
-                    border: '1px solid #D4D4D8',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Toggle Switch for Sold Out Section */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                backgroundColor: '#FAFAFA',
-                borderRadius: '6px',
-                border: '1px solid #E4E4E7'
-              }}>
-                <div>
-                  <strong style={{ fontSize: '13px', display: 'block', color: '#121212' }}>Sold Out Archive</strong>
-                  <span style={{ fontSize: '11px', color: '#71717A' }}>Display historical 1-of-1 pieces</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={settings.sold_out_section_enabled}
-                  onChange={(e) => setSettings({ ...settings, sold_out_section_enabled: e.target.checked })}
-                  style={{ width: '24px', height: '24px', cursor: 'pointer' }}
+                <textarea
+                  rows={6}
+                  required
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  disabled={broadcastSending}
+                  placeholder="Enter the drop alert announcement for VIP subscribers (e.g., batch release notes, 1-of-1 link, special drops)..."
+                  className="w-full p-3 bg-white border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:border-zinc-800 disabled:bg-zinc-100 resize-y"
                 />
               </div>
 
               <button
                 type="submit"
-                style={{
-                  width: '100%',
-                  minHeight: '48px',
-                  backgroundColor: '#121212',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  cursor: 'pointer',
-                  marginTop: '8px'
-                }}
+                disabled={broadcastSending}
+                className="w-full min-h-[50px] bg-[#121212] text-white rounded-lg text-sm font-extrabold tracking-wide uppercase flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors disabled:opacity-60"
               >
-                SAVE CONFIGURATION
+                {broadcastSending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={15} />
+                    <span>SEND DROP ALERT BLAST</span>
+                  </>
+                )}
               </button>
+
+              <div className="text-[11px] text-zinc-400 text-center">
+                Dispatches via POST /api/broadcast with hidden BCC headers
+              </div>
             </form>
+          </div>
+        )}
+
+      </main>
+
+      {/* ========================================================
+          3. DIGITAL RECEIPT MODAL OVERLAY (DARK-THEMED TICKET STYLE)
+          Perforated divider line & jagged/sawtooth bottom tear edge
+      ======================================================== */}
+      {selectedOrder && (
+        <div
+          onClick={() => setSelectedOrder(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        >
+          {/* Ticket Card Container */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm sm:max-w-md bg-[#0D0D0E] text-white rounded-t-2xl shadow-2xl relative overflow-hidden border border-zinc-800 my-auto animate-in fade-in zoom-in-95 duration-200"
+          >
+            {/* Ticket Header Bar */}
+            <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-mono tracking-widest text-zinc-300 uppercase font-black">
+                  CURATED // DIGITAL RECEIPT
+                </span>
+              </div>
+
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-colors"
+                aria-label="Close receipt"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Ticket Content Area */}
+            <div className="p-4 sm:p-5 space-y-4">
+              
+              {/* TOP SECTION: Large Total Payment & Thumbnail Photo of Ordered Product */}
+              {(() => {
+                const firstItem = selectedOrder.items?.[0] || {};
+                const productThumb = selectedOrder.product_image_url || firstItem.image || firstItem.image_url || firstItem.images?.[0];
+                const productTitle = firstItem.name || 'Curated Archival Piece';
+
+                return (
+                  <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 flex items-center justify-between gap-3">
+                    {/* Left: Total Payment */}
+                    <div className="flex flex-col justify-center min-w-0 flex-1">
+                      <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-black">
+                        TOTAL PAYMENT
+                      </span>
+                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+                        ₹{(parseFloat(selectedOrder.total_amount) || 0).toLocaleString('en-IN')}
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                          (selectedOrder.status || '').toUpperCase() === 'PACKED'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            : 'bg-zinc-800 text-amber-300 border border-zinc-700'
+                        }`}>
+                          {selectedOrder.status === 'PACKED' ? 'PACKED ✓' : 'PENDING PACKING'}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                          {selectedOrder.payment_status || 'PAID'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Thumbnail photo of ordered product */}
+                    <div className="shrink-0 flex flex-col items-center">
+                      {productThumb ? (
+                        <img
+                          src={productThumb}
+                          alt={productTitle}
+                          className="w-18 h-22 sm:w-20 sm:h-24 object-cover rounded-lg bg-zinc-800 border border-zinc-700 shadow-md"
+                        />
+                      ) : (
+                        <div className="w-18 h-22 sm:w-20 sm:h-24 rounded-lg bg-zinc-800 border border-zinc-700 flex flex-col items-center justify-center text-zinc-500 shadow-md p-2 text-center">
+                          <Package size={22} className="text-zinc-500 mb-1" />
+                          <span className="text-[9px] text-zinc-400 uppercase font-bold">1-of-1 Piece</span>
+                        </div>
+                      )}
+                      <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[85px] mt-1 text-center">
+                        {productTitle}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 2x2 GRID: Order ID, Date/Time, Customer Name, Phone Number */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Order ID */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
+                    ORDER ID
+                  </span>
+                  <span className="font-mono text-xs font-black text-white truncate block mt-1">
+                    #{selectedOrder.order_number || selectedOrder.id.slice(0, 8)}
+                  </span>
+                </div>
+
+                {/* 2. Date/Time */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
+                    DATE / TIME
+                  </span>
+                  <span className="text-xs font-bold text-white truncate block mt-1">
+                    {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    }) : 'N/A'}
+                  </span>
+                </div>
+
+                {/* 3. Customer Name */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
+                    CUSTOMER NAME
+                  </span>
+                  <span className="text-xs font-bold text-white truncate block mt-1">
+                    {selectedOrder.customer_name || 'Customer'}
+                  </span>
+                </div>
+
+                {/* 4. Phone Number */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
+                    PHONE NUMBER
+                  </span>
+                  <span className="text-xs font-bold text-white truncate block mt-1">
+                    {selectedOrder.phone_number || selectedOrder.shipping_address?.phone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* FULL-WIDTH SECTION: Shipping Address & Customer Email */}
+              <div className="flex flex-col gap-2.5">
+                {/* Shipping Address */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3.5 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                    SHIPPING ADDRESS
+                  </span>
+                  <div className="text-xs font-medium text-zinc-200 leading-relaxed">
+                    {(() => {
+                      const addr = selectedOrder.shipping_address;
+                      if (!addr) {
+                        return 'No shipping address recorded';
+                      }
+                      if (typeof addr === 'string') {
+                        return addr;
+                      }
+                      if (typeof addr === 'object') {
+                        const line1 = addr.address || addr.street || addr.line1 || '';
+                        const city = addr.city || '';
+                        const state = addr.state || '';
+                        const pin = addr.pincode || addr.postal_code || addr.zip || '';
+                        const parts = [line1, city, state, pin].filter(Boolean);
+                        return parts.length > 0 ? parts.join(', ') : 'No physical address details';
+                      }
+                      return 'No shipping address recorded';
+                    })()}
+                  </div>
+                </div>
+
+                {/* Customer Email */}
+                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3.5 rounded-lg">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                    CUSTOMER EMAIL
+                  </span>
+                  <div className="text-xs font-mono font-medium text-zinc-200 break-all">
+                    {selectedOrder.customer_email || selectedOrder.email || 'No email address on file'}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Perforated Dashed Line with Semicircular Ticket Cutouts */}
+            <div className="relative py-2.5">
+              <div className="w-5 h-5 rounded-full bg-black/90 border border-zinc-800 absolute -left-2.5 top-1/2 -translate-y-1/2" />
+              <div className="w-5 h-5 rounded-full bg-black/90 border border-zinc-800 absolute -right-2.5 top-1/2 -translate-y-1/2" />
+              <div className="w-full border-b-2 border-dashed border-zinc-700" />
+            </div>
+
+            {/* Ticket Footer Action Buttons: Close & Download PDF */}
+            <div className="grid grid-cols-2 gap-2.5 p-4 pt-1 pb-5">
+              <button
+                onClick={() => window.print()}
+                className="min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Printer size={14} />
+                <span>DOWNLOAD PDF</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="min-h-[44px] bg-white hover:bg-zinc-200 text-zinc-900 rounded-lg text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-colors"
+              >
+                CLOSE
+              </button>
+            </div>
+
+            {/* Perforated / Jagged / Sawtooth Bottom Ticket Edge (SVG) */}
+            <div className="w-full overflow-hidden leading-none -mt-px select-none">
+              <svg
+                viewBox="0 0 400 16"
+                preserveAspectRatio="none"
+                className="w-full h-4 text-[#0D0D0E] fill-current block"
+              >
+                <polygon points="0,0 10,16 20,0 30,16 40,0 50,16 60,0 70,16 80,0 90,16 100,0 110,16 120,0 130,16 140,0 150,16 160,0 170,16 180,0 190,16 200,0 210,16 220,0 230,16 240,0 250,16 260,0 270,16 280,0 290,16 300,0 310,16 320,0 330,16 340,0 350,16 360,0 370,16 380,0 390,16 400,0" />
+              </svg>
+            </div>
+
           </div>
         </div>
       )}
 
-      </main>
-
-      {/* 3. Mobile Fixed Bottom Tab Bar */}
-      <nav
-        className="fixed bottom-0 w-full z-50 bg-[#0B0B0C]"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          maxWidth: '100vw',
-          zIndex: 50,
-          backgroundColor: '#0B0B0C',
-          borderTop: '1px solid #1E1E22',
-          height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          boxSizing: 'border-box'
-        }}
-      >
-        {/* Nav Item: Dashboard */}
+      {/* ========================================================
+          4. MOBILE-FIRST FIXED BOTTOM NAVIGATION BAR
+          Tabs: Dashboard, Orders, Catalog, Drop Alerts
+          (No desktop sidebars)
+      ======================================================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0B0C] border-t border-zinc-800 h-16 flex items-center justify-around px-2 max-w-full">
+        
+        {/* Tab 1: Dashboard */}
         <button
           onClick={() => setActiveTab('dashboard')}
           aria-label="Dashboard"
-          style={{
-            minHeight: '44px',
-            height: '100%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: activeTab === 'dashboard' ? '#FFFFFF' : '#71717A',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            flex: 1,
-            padding: '6px 0',
-            transition: 'color 0.15s ease'
-          }}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+            activeTab === 'dashboard' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
         >
-          <LayoutDashboard size={20} color={activeTab === 'dashboard' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '11px', fontWeight: activeTab === 'dashboard' ? 800 : 600, letterSpacing: '0.04em' }}>
+          <LayoutDashboard size={20} className={activeTab === 'dashboard' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[11px] tracking-wide ${activeTab === 'dashboard' ? 'font-black' : 'font-semibold'}`}>
             Dashboard
           </span>
         </button>
 
-        {/* Nav Item: Orders */}
+        {/* Tab 2: Orders */}
         <button
           onClick={() => setActiveTab('orders')}
           aria-label="Orders"
-          style={{
-            minHeight: '44px',
-            height: '100%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: activeTab === 'orders' ? '#FFFFFF' : '#71717A',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            position: 'relative',
-            flex: 1,
-            padding: '6px 0',
-            transition: 'color 0.15s ease'
-          }}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer relative transition-colors ${
+            activeTab === 'orders' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
         >
-          <div style={{ position: 'relative', display: 'inline-flex' }}>
-            <ShoppingBag size={20} color={activeTab === 'orders' ? '#FFFFFF' : '#71717A'} />
-            {pendingOrdersCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-8px',
-                backgroundColor: '#EF4444',
-                color: '#FFFFFF',
-                fontSize: '9px',
-                fontWeight: 900,
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {pendingOrdersCount}
+          <div className="relative">
+            <ShoppingBag size={20} className={activeTab === 'orders' ? 'text-white' : 'text-zinc-500'} />
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                {pendingCount}
               </span>
             )}
           </div>
-          <span style={{ fontSize: '11px', fontWeight: activeTab === 'orders' ? 800 : 600, letterSpacing: '0.04em' }}>
+          <span className={`text-[11px] tracking-wide ${activeTab === 'orders' ? 'font-black' : 'font-semibold'}`}>
             Orders
           </span>
         </button>
 
-        {/* Nav Item: Catalog */}
+        {/* Tab 3: Catalog */}
         <button
           onClick={() => setActiveTab('catalog')}
           aria-label="Catalog"
-          style={{
-            minHeight: '44px',
-            height: '100%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: activeTab === 'catalog' ? '#FFFFFF' : '#71717A',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            flex: 1,
-            padding: '6px 0',
-            transition: 'color 0.15s ease'
-          }}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+            activeTab === 'catalog' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
         >
-          <Package size={20} color={activeTab === 'catalog' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '11px', fontWeight: activeTab === 'catalog' ? 800 : 600, letterSpacing: '0.04em' }}>
+          <Package size={20} className={activeTab === 'catalog' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[11px] tracking-wide ${activeTab === 'catalog' ? 'font-black' : 'font-semibold'}`}>
             Catalog
           </span>
         </button>
 
-        {/* Nav Item: Settings */}
+        {/* Tab 4: Drop Alerts */}
         <button
-          onClick={() => setActiveTab('settings')}
-          aria-label="Settings"
-          style={{
-            minHeight: '44px',
-            height: '100%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: activeTab === 'settings' ? '#FFFFFF' : '#71717A',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            flex: 1,
-            padding: '6px 0',
-            transition: 'color 0.15s ease'
-          }}
+          onClick={() => setActiveTab('drop-alerts')}
+          aria-label="Drop Alerts"
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+            activeTab === 'drop-alerts' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
         >
-          <Settings size={20} color={activeTab === 'settings' ? '#FFFFFF' : '#71717A'} />
-          <span style={{ fontSize: '11px', fontWeight: activeTab === 'settings' ? 800 : 600, letterSpacing: '0.04em' }}>
-            Settings
+          <Bell size={20} className={activeTab === 'drop-alerts' ? 'text-white' : 'text-zinc-500'} />
+          <span className={`text-[11px] tracking-wide ${activeTab === 'drop-alerts' ? 'font-black' : 'font-semibold'}`}>
+            Drop Alerts
           </span>
         </button>
+
       </nav>
 
     </div>
