@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import supabase from './supabaseClient';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -17,17 +17,10 @@ import OrdersView from './components/OrdersView';
 import AdminPanel from './components/AdminPanel';
 import NikhilAdminDashboard from './components/NikhilAdminDashboard';
 import StayTunedSection from './components/StayTunedSection';
-import CurvedLoop from './components/CurvedLoop';
 import {
   ArrowRight,
   ShieldCheck,
-  Search as SearchIcon,
-  Package,
-  Truck,
-  CreditCard,
-  Sparkles,
-  Check,
-  Eye
+  Package
 } from 'lucide-react';
 
 const ProductCardSkeleton = () => (
@@ -130,6 +123,95 @@ export default function App() {
     localStorage.setItem('curated_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
+  const fetchProductsAndSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch live products from Supabase products table
+      let query = supabase.from('products').select('*');
+
+      if (sortBy === 'price-low') {
+        query = query.order('selling_price', { ascending: true });
+      } else if (sortBy === 'price-high') {
+        query = query.order('selling_price', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      const { data: supabaseProducts, error: prodError } = await query;
+
+      if (prodError) {
+        console.error('Error fetching products from Supabase:', prodError);
+      } else if (Array.isArray(supabaseProducts)) {
+        const normalized = supabaseProducts.map((p) => {
+          let imgs = p.images;
+          if (!Array.isArray(imgs)) {
+            if (p.image_url) imgs = [p.image_url];
+            else if (typeof imgs === 'string') {
+              try { imgs = JSON.parse(imgs); } catch { imgs = [imgs]; }
+            } else {
+              imgs = [];
+            }
+          }
+          if (p.image_url && !imgs.includes(p.image_url)) {
+            imgs = [p.image_url, ...imgs];
+          }
+
+          const primaryVariant = (Array.isArray(p.variants) && p.variants.length > 0)
+            ? p.variants
+            : [{
+                id: `var-${p.id}`,
+                product_id: p.id,
+                size: p.size || 'One Size',
+                on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                stock_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+                reserved: 0
+              }];
+
+          const deliveryCharge = parseFloat(
+            p.delivery_charge ?? p.deliveryCharge ?? p.measurements?.delivery_charge ?? p.cost_price
+          ) || 0;
+
+          return {
+            ...p,
+            name: p.title || p.name || 'Untitled Piece',
+            title: p.title || p.name || 'Untitled Piece',
+            selling_price: parseFloat(p.selling_price) || 0,
+            original_price: p.original_price ? parseFloat(p.original_price) : null,
+            delivery_charge: deliveryCharge,
+            deliveryCharge: deliveryCharge,
+            image_url: imgs[0] || p.image_url || '',
+            images: imgs,
+            variants: primaryVariant,
+            category_id: p.category_id || p.category || 't-shirts',
+            condition: p.condition || 'New / Unused',
+            total_available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
+            total_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1)
+          };
+        });
+        setProducts(normalized);
+      }
+
+      // 2. Fetch settings
+      try {
+        const { data: setRes } = await supabase.from('settings').select('*').single();
+        if (setRes) {
+          setSettings((prev) => ({ ...prev, ...setRes }));
+        }
+      } catch {
+        // default settings remain active
+      }
+    } catch (err) {
+      console.error('Error fetching storefront data from Supabase:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [sortBy]);
+
+  useEffect(() => {
+    fetchProductsAndSettings();
+  }, [fetchProductsAndSettings]);
+
   // Handle URL routing for /checkout, /nikhil, /orders, and Supabase Google OAuth callback
   useEffect(() => {
     const handleLocationChange = () => {
@@ -221,7 +303,7 @@ export default function App() {
       authListener?.subscription?.unsubscribe();
       productsChannel?.unsubscribe();
     };
-  }, []);
+  }, [fetchProductsAndSettings]);
 
   const handleOpenCheckout = () => {
     setCartDrawerOpen(false);
@@ -242,94 +324,7 @@ export default function App() {
     }
   };
 
-  const fetchProductsAndSettings = async () => {
-    setLoading(true);
-    try {
-      // 1. Fetch live products from Supabase products table
-      let query = supabase.from('products').select('*');
 
-      if (sortBy === 'price-low') {
-        query = query.order('selling_price', { ascending: true });
-      } else if (sortBy === 'price-high') {
-        query = query.order('selling_price', { ascending: false });
-      } else {
-        query = query.order('created_at', { ascending: false });
-      }
-
-      const { data: supabaseProducts, error: prodError } = await query;
-
-      if (prodError) {
-        console.error('Error fetching products from Supabase:', prodError);
-      } else if (Array.isArray(supabaseProducts)) {
-        const normalized = supabaseProducts.map((p) => {
-          let imgs = p.images;
-          if (!Array.isArray(imgs)) {
-            if (p.image_url) imgs = [p.image_url];
-            else if (typeof imgs === 'string') {
-              try { imgs = JSON.parse(imgs); } catch { imgs = [imgs]; }
-            } else {
-              imgs = [];
-            }
-          }
-          if (p.image_url && !imgs.includes(p.image_url)) {
-            imgs = [p.image_url, ...imgs];
-          }
-
-          const primaryVariant = (Array.isArray(p.variants) && p.variants.length > 0)
-            ? p.variants
-            : [{
-                id: `var-${p.id}`,
-                product_id: p.id,
-                size: p.size || 'One Size',
-                on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
-                available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
-                stock_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1),
-                reserved: 0
-              }];
-
-          const deliveryCharge = parseFloat(
-            p.delivery_charge ?? p.deliveryCharge ?? p.measurements?.delivery_charge ?? p.cost_price
-          ) || 0;
-
-          return {
-            ...p,
-            name: p.title || p.name || 'Untitled Piece',
-            title: p.title || p.name || 'Untitled Piece',
-            selling_price: parseFloat(p.selling_price) || 0,
-            original_price: p.original_price ? parseFloat(p.original_price) : null,
-            delivery_charge: deliveryCharge,
-            deliveryCharge: deliveryCharge,
-            image_url: imgs[0] || p.image_url || '',
-            images: imgs,
-            variants: primaryVariant,
-            category_id: p.category_id || p.category || 't-shirts',
-            condition: p.condition || 'New / Unused',
-            total_available: p.total_available ?? (p.status === 'SOLD_OUT' ? 0 : 1),
-            total_on_hand: p.total_on_hand ?? (p.status === 'SOLD_OUT' ? 0 : 1)
-          };
-        });
-        setProducts(normalized);
-      }
-
-      // 2. Fetch settings
-      try {
-        const { data: setRes } = await supabase.from('settings').select('*').single();
-        if (setRes) {
-          setSettings((prev) => ({ ...prev, ...setRes }));
-        }
-      } catch (e) {
-        // default settings remain active
-      }
-    } catch (err) {
-      console.error('Error fetching storefront data from Supabase:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProductsAndSettings();
-  }, [sortBy]);
 
   const handleAddToCart = (product, variant) => {
     setCartItems((prev) => {
@@ -454,7 +449,7 @@ export default function App() {
       )}
 
       {/* Main Content Areas */}
-      <main style={{ flexGrow: 1 }}>
+      <main style={{ flexGrow: 1, width: '100%' }}>
         {/* ========================================================
             VIEW: NIKHIL PROTECTED ADMIN DASHBOARD (/nikhil)
         ======================================================== */}
