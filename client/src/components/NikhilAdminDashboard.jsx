@@ -21,7 +21,7 @@ import {
   ShieldCheck,
   Lock,
   ChevronRight,
-  Printer
+  Download
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
@@ -1496,216 +1496,202 @@ export default function NikhilAdminDashboard({ onExit }) {
 
       {/* ========================================================
           3. DIGITAL RECEIPT MODAL OVERLAY (DARK-THEMED TICKET STYLE)
-          Perforated divider line & jagged/sawtooth bottom tear edge
+          Directly matching Image 2 reference:
+          - Centered Total Payment
+          - Sleek 2x2 grid cards (Ref Number, Payment Time, Customer Name, Phone Number)
+          - Shipping Address & Customer Email in matching subtle dark cards
+          - "Get PDF Receipt" action button with download icon
+          - Scalloped circular perforated receipt bottom tear
       ======================================================== */}
       {selectedOrder && (
         <div
           onClick={() => setSelectedOrder(null)}
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-none"
         >
-          {/* Ticket Card Container with max-height and internal scroll */}
+          {/* Ticket Card Container */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm sm:max-w-md bg-[#0D0D0E] text-white rounded-2xl shadow-2xl relative overflow-hidden border border-zinc-800/80 my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
+            className="w-full max-w-sm sm:max-w-md my-auto flex flex-col drop-shadow-2xl relative animate-in fade-in zoom-in-95 duration-200"
           >
-            {/* Ticket Top Header Bar */}
-            <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-950/80 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] font-mono tracking-widest text-zinc-300 uppercase font-black">
-                  CURATED // DIGITAL RECEIPT
-                </span>
-              </div>
-
+            {/* Ticket Card Body */}
+            <div className="bg-[#141518] text-white rounded-t-3xl pt-7 px-5 pb-2 relative border-t border-x border-zinc-800/60 flex flex-col max-h-[85vh]">
+              
+              {/* Top Right Subtle Close Button */}
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-colors"
+                className="absolute top-4 right-4 p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/60 cursor-pointer transition-colors"
                 aria-label="Close receipt"
               >
                 <X size={18} />
               </button>
-            </div>
 
-            {/* Scrollable Ticket Content */}
-            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
-              
-              {/* TOP SECTION: Large Total Payment & Thumbnail Photo */}
-              {(() => {
-                const firstItem = selectedOrder.items?.[0] || {};
-                const productThumb = selectedOrder.product_image_url || firstItem.image || firstItem.image_url || firstItem.images?.[0];
-                const productTitle = firstItem.name || 'Curated Archival Piece';
+              {/* Scrollable Receipt Body */}
+              <div className="overflow-y-auto flex-1 overscroll-contain pr-0.5 space-y-3.5">
+                
+                {/* 1. Centered Total Payment Section */}
+                <div className="text-center pt-1 pb-1">
+                  <span className="text-xs text-zinc-400 font-medium tracking-wide">
+                    Total Payment
+                  </span>
+                  <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mt-1">
+                    ₹{(parseFloat(selectedOrder.total_amount) || 0).toLocaleString('en-IN')}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      (selectedOrder.status || '').toUpperCase() === 'PACKED'
+                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                        : 'bg-zinc-800 text-amber-300 border border-zinc-700'
+                    }`}>
+                      {selectedOrder.status === 'PACKED' ? 'PACKED ✓' : 'PENDING PACKING'}
+                    </span>
+                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                      {selectedOrder.payment_status || 'PAID'}
+                    </span>
+                  </div>
+                </div>
 
-                return (
-                  <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 sm:p-4 flex items-center justify-between gap-3">
-                    {/* Left: Total Payment */}
-                    <div className="flex flex-col justify-center min-w-0 flex-1">
-                      <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-bold">
-                        TOTAL PAYMENT
-                      </span>
-                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
-                        ₹{(parseFloat(selectedOrder.total_amount) || 0).toLocaleString('en-IN')}
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
-                          (selectedOrder.status || '').toUpperCase() === 'PACKED'
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                            : 'bg-zinc-800 text-amber-300 border border-zinc-700'
-                        }`}>
-                          {selectedOrder.status === 'PACKED' ? 'PACKED ✓' : 'PENDING PACKING'}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 uppercase font-semibold">
-                          {selectedOrder.payment_status || 'PAID'}
-                        </span>
-                      </div>
-                    </div>
+                {/* Optional Product Piece Bar */}
+                {(() => {
+                  const firstItem = selectedOrder.items?.[0] || {};
+                  const productThumb = selectedOrder.product_image_url || firstItem.image || firstItem.image_url || firstItem.images?.[0];
+                  const productTitle = firstItem.name;
 
-                    {/* Right: Thumbnail Photo */}
-                    <div className="shrink-0 flex flex-col items-center">
+                  if (!productTitle && !productThumb) return null;
+
+                  return (
+                    <div className="flex items-center gap-3 bg-zinc-800/35 border border-zinc-800/90 rounded-2xl p-2.5 text-left">
                       {productThumb ? (
                         <img
                           src={productThumb}
-                          alt={productTitle}
-                          className="w-[72px] h-[90px] object-cover rounded-lg bg-zinc-800 border border-zinc-700 shadow-md"
+                          alt={productTitle || 'Piece'}
+                          className="w-10 h-12 object-cover rounded-lg bg-zinc-800 border border-zinc-700/60 shrink-0"
                         />
                       ) : (
-                        <div className="w-[72px] h-[90px] rounded-lg bg-zinc-800 border border-zinc-700 flex flex-col items-center justify-center text-zinc-500 shadow-md p-2 text-center">
-                          <Package size={22} className="text-zinc-500 mb-1" />
-                          <span className="text-[9px] text-zinc-400 uppercase font-bold">1-of-1 Piece</span>
+                        <div className="w-10 h-12 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-400 shrink-0">
+                          <Package size={16} />
                         </div>
                       )}
-                      <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[80px] mt-1 text-center">
-                        {productTitle}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white truncate">
+                          {productTitle || 'Archival Streetwear Piece'}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 mt-0.5">
+                          {firstItem.size || 'One Size'} • 1-of-1 Piece
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. 2x2 Grid: Ref Number, Payment Time, Customer Name, Phone Number */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Cell 1: Ref Number */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block">
+                      Ref Number
+                    </span>
+                    <span className="font-mono text-xs sm:text-sm font-semibold text-white truncate block mt-1">
+                      #{selectedOrder.order_number || selectedOrder.id.slice(0, 8)}
+                    </span>
+                  </div>
+
+                  {/* Cell 2: Payment Time */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block">
+                      Payment Time
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-white truncate block mt-1">
+                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      }) : 'N/A'}
+                    </span>
+                  </div>
+
+                  {/* Cell 3: Customer Name */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block">
+                      Customer Name
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-white truncate block mt-1">
+                      {selectedOrder.customer_name || 'Customer'}
+                    </span>
+                  </div>
+
+                  {/* Cell 4: Phone Number */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block">
+                      Phone Number
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-white truncate block mt-1">
+                      {selectedOrder.phone_number || selectedOrder.shipping_address?.phone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Shipping Address & Customer Email */}
+                <div className="flex flex-col gap-2.5">
+                  {/* Shipping Address */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block mb-1">
+                      Shipping Address
+                    </span>
+                    <div className="text-xs font-medium text-zinc-200 leading-relaxed">
+                      {(() => {
+                        const addr = selectedOrder.shipping_address;
+                        if (!addr) return 'No shipping address recorded';
+                        if (typeof addr === 'string') return addr;
+                        if (typeof addr === 'object') {
+                          const line1 = addr.address || addr.street || addr.line1 || '';
+                          const city = addr.city || '';
+                          const state = addr.state || '';
+                          const pin = addr.pincode || addr.postal_code || addr.zip || '';
+                          const parts = [line1, city, state, pin].filter(Boolean);
+                          return parts.length > 0 ? parts.join(', ') : 'No physical address details';
+                        }
+                        return 'No shipping address recorded';
+                      })()}
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* 2x2 GRID: Order ID, Date/Time, Customer Name, Phone Number */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* 1. Order ID */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
-                    ORDER ID
-                  </span>
-                  <span className="font-mono text-xs font-black text-white truncate block mt-0.5">
-                    #{selectedOrder.order_number || selectedOrder.id.slice(0, 8)}
-                  </span>
-                </div>
-
-                {/* 2. Date/Time */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
-                    DATE / TIME
-                  </span>
-                  <span className="text-xs font-bold text-white truncate block mt-0.5">
-                    {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true
-                    }) : 'N/A'}
-                  </span>
-                </div>
-
-                {/* 3. Customer Name */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
-                    CUSTOMER NAME
-                  </span>
-                  <span className="text-xs font-bold text-white truncate block mt-0.5">
-                    {selectedOrder.customer_name || 'Customer'}
-                  </span>
-                </div>
-
-                {/* 4. Phone Number */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-2.5 sm:p-3 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">
-                    PHONE NUMBER
-                  </span>
-                  <span className="text-xs font-bold text-white truncate block mt-0.5">
-                    {selectedOrder.phone_number || selectedOrder.shipping_address?.phone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}
-                  </span>
-                </div>
-              </div>
-
-              {/* FULL-WIDTH SECTION: Shipping Address & Customer Email */}
-              <div className="flex flex-col gap-2.5">
-                {/* Shipping Address */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 sm:p-3.5 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
-                    SHIPPING ADDRESS
-                  </span>
-                  <div className="text-xs font-medium text-zinc-200 leading-relaxed">
-                    {(() => {
-                      const addr = selectedOrder.shipping_address;
-                      if (!addr) {
-                        return 'No shipping address recorded';
-                      }
-                      if (typeof addr === 'string') {
-                        return addr;
-                      }
-                      if (typeof addr === 'object') {
-                        const line1 = addr.address || addr.street || addr.line1 || '';
-                        const city = addr.city || '';
-                        const state = addr.state || '';
-                        const pin = addr.pincode || addr.postal_code || addr.zip || '';
-                        const parts = [line1, city, state, pin].filter(Boolean);
-                        return parts.length > 0 ? parts.join(', ') : 'No physical address details';
-                      }
-                      return 'No shipping address recorded';
-                    })()}
+                  {/* Customer Email */}
+                  <div className="bg-zinc-800/35 border border-zinc-800/90 p-3 sm:p-3.5 rounded-2xl text-left">
+                    <span className="text-[11px] text-zinc-400 font-medium block mb-1">
+                      Customer Email
+                    </span>
+                    <div className="text-xs font-mono font-medium text-zinc-200 break-all">
+                      {selectedOrder.customer_email || selectedOrder.email || 'No email address on file'}
+                    </div>
                   </div>
                 </div>
 
-                {/* Customer Email */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 sm:p-3.5 rounded-lg">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
-                    CUSTOMER EMAIL
-                  </span>
-                  <div className="text-xs font-mono font-medium text-zinc-200 break-all">
-                    {selectedOrder.customer_email || selectedOrder.email || 'No email address on file'}
-                  </div>
+                {/* 4. Action Button: "Get PDF Receipt" (Matching Image 2) */}
+                <div className="pt-2 pb-1">
+                  <button
+                    onClick={() => window.print()}
+                    className="w-full py-3 flex items-center justify-center gap-2 text-zinc-300 hover:text-white font-medium text-xs sm:text-sm cursor-pointer transition-colors group"
+                  >
+                    <Download size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
+                    <span>Get PDF Receipt</span>
+                  </button>
                 </div>
+
               </div>
 
             </div>
 
-            {/* Perforated Dashed Line with Semicircular Ticket Cutouts */}
-            <div className="relative py-2 shrink-0 select-none">
-              <div className="w-5 h-5 rounded-full bg-[#000000] border border-zinc-800 absolute -left-2.5 top-1/2 -translate-y-1/2" />
-              <div className="w-5 h-5 rounded-full bg-[#000000] border border-zinc-800 absolute -right-2.5 top-1/2 -translate-y-1/2" />
-              <div className="w-full border-b border-dashed border-zinc-700/80" />
-            </div>
-
-            {/* Ticket Footer Action Buttons: Close & Download PDF */}
-            <div className="grid grid-cols-2 gap-2.5 p-4 pt-1 pb-3 shrink-0">
-              <button
-                onClick={() => window.print()}
-                className="min-h-[42px] bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Printer size={13} />
-                <span>PRINT / PDF</span>
-              </button>
-
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="min-h-[42px] bg-white hover:bg-zinc-200 text-zinc-900 rounded-xl text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-colors"
-              >
-                CLOSE
-              </button>
-            </div>
-
-            {/* Perforated / Jagged / Sawtooth Bottom Ticket Edge (SVG) */}
-            <div className="w-full overflow-hidden leading-none select-none shrink-0">
+            {/* Scalloped Perforated Bottom Tear (Matching Image 2 Semicircular Teeth) */}
+            <div className="w-full overflow-hidden leading-none select-none">
               <svg
-                viewBox="0 0 400 14"
+                viewBox="0 0 400 10"
                 preserveAspectRatio="none"
-                className="w-full h-3.5 text-[#0D0D0E] fill-current block"
+                className="w-full h-2.5 sm:h-3 text-[#141518] fill-current block -mt-px filter drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]"
               >
-                <polygon points="0,0 10,14 20,0 30,14 40,0 50,14 60,0 70,14 80,0 90,14 100,0 110,14 120,0 130,14 140,0 150,14 160,0 170,14 180,0 190,14 200,0 210,14 220,0 230,14 240,0 250,14 260,0 270,14 280,0 290,14 300,0 310,14 320,0 330,14 340,0 350,14 360,0 370,14 380,0 390,14 400,0" />
+                <path d="M 0 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 a 8 8 0 0 0 16 0 L 0 0 Z" />
               </svg>
             </div>
 
