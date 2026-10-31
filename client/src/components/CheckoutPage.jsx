@@ -18,7 +18,7 @@ import confetti from 'canvas-confetti';
 import supabase from '../supabaseClient';
 import { useCheckoutAuth } from '../hooks/useCheckoutAuth';
 
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
 
 function loadRazorpaySdk() {
   return new Promise((resolve) => {
@@ -135,8 +135,8 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Launch Razorpay Checkout Popup
-  const triggerRazorpayCheckout = async (orderRef, rzpOrder) => {
+  // Launch Razorpay Checkout Popup immediately
+  const triggerRazorpayCheckout = async (orderRef, customAmount = null) => {
     setSubmitting(true);
     setErrorMessage('');
     setPaymentStatusMsg({ text: 'Opening secure Razorpay payment window...', type: 'info' });
@@ -144,6 +144,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     const sdkLoaded = await loadRazorpaySdk();
     if (!sdkLoaded || !window.Razorpay) {
       setSubmitting(false);
+      setStep('GATEWAY');
       setErrorMessage('Unable to load Razorpay payment gateway. Please check your internet connection.');
       return;
     }
@@ -156,16 +157,16 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
       }
     } catch (e) {}
 
-    const amountInPaise = rzpOrder?.amount || Math.round(total * 100);
-    const key = rzpOrder?.key_id || RAZORPAY_KEY_ID;
+    const payableAmount = customAmount !== null ? customAmount : total;
+    const amountInPaise = Math.round(payableAmount * 100);
+    const key = RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
 
     const options = {
       key: key,
       amount: amountInPaise,
-      currency: rzpOrder?.currency || 'INR',
+      currency: 'INR',
       name: 'CURATED',
       description: `Order #${orderRef} • 1-of-1 Archival Piece`,
-      order_id: rzpOrder?.order_id,
       image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23121212"/><text x="16" y="21" font-family="sans-serif" font-size="16" font-weight="900" fill="%23FFFFFF" text-anchor="middle">C</text></svg>',
       prefill: {
         name: shippingDetails.name || profile?.fullName || '',
@@ -185,8 +186,9 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
         confirm_close: true,
         ondismiss: function () {
           setSubmitting(false);
+          setStep('GATEWAY');
           setPaymentStatusMsg({
-            text: 'Payment window was closed. Click below to complete your payment before the hold expires.',
+            text: 'Payment was closed. You can complete your payment below before the reservation expires.',
             type: 'warning'
           });
         }
@@ -201,16 +203,16 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             customer_name: shippingDetails.name || profile?.fullName || 'Customer',
             customer_email: shippingDetails.email || profile?.email || 'customer@example.com',
             customer: shippingDetails,
-            total_amount: total,
-            total: total,
+            total_amount: payableAmount,
+            total: payableAmount,
             status: 'PENDING',
             payment_status: 'PAID',
             payment_mode: 'RAZORPAY',
             gateway_id: response.razorpay_payment_id,
             gateway_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
+            razorpay_order_id: response.razorpay_order_id || '',
             razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
+            razorpay_signature: response.razorpay_signature || '',
             items: cartItems.map((it) => ({
               product_id: it.id || it.product_id,
               name: it.name || it.title,
@@ -224,9 +226,9 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             shipping_address: {
               ...shippingDetails,
               payment_mode: 'RAZORPAY',
-              razorpay_order_id: response.razorpay_order_id,
+              razorpay_order_id: response.razorpay_order_id || '',
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
+              razorpay_signature: response.razorpay_signature || ''
             },
             created_at: new Date().toISOString()
           };
@@ -237,7 +239,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
               order_number: orderRef,
               customer_name: orderPayload.customer_name,
               customer_email: orderPayload.customer_email,
-              total_amount: total,
+              total_amount: payableAmount,
               status: 'PENDING',
               payment_status: 'PAID',
               items: orderPayload.items,
@@ -252,7 +254,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             console.warn('[Checkout] Supabase sync notice:', sbErr);
           }
 
-          // 2. Call backend verification endpoint
+          // 2. Call backend verification endpoint (if active)
           try {
             await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
@@ -299,17 +301,19 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
       const rzpInstance = new window.Razorpay(options);
       rzpInstance.on('payment.failed', function (failResp) {
         setSubmitting(false);
+        setStep('GATEWAY');
         setErrorMessage(failResp.error?.description || 'Payment failed. Please try a different payment method.');
       });
       rzpInstance.open();
     } catch (e) {
       console.error('[Razorpay Launch Error]:', e);
       setSubmitting(false);
-      setErrorMessage('Could not initialize Razorpay payment modal.');
+      setStep('GATEWAY');
+      setErrorMessage(`Could not initialize Razorpay payment modal: ${e.message || 'Key or configuration error'}`);
     }
   };
 
-  // Step 1: Proceed to Payment Gateway (Create Razorpay Order & Advance)
+  // Step 1: Proceed to Payment Gateway (Open Razorpay Pop-Up Directly)
   const handleProceedToPayment = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -347,48 +351,10 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     setCurrentOrder(orderData);
     setHoldExpiresAt(expiresAt);
     setHoldSecondsLeft(600);
-    setStep('GATEWAY');
     setSubmitting(true);
 
-    // Call create-order endpoint
-    try {
-      const res = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: total,
-          currency: 'INR',
-          receipt: orderNumber,
-          notes: {
-            order_number: orderNumber,
-            customer_name: formData.name,
-            customer_email: formData.email,
-            customer_mobile: formData.mobile
-          }
-        })
-      });
-
-      const rzpOrder = await res.json();
-      if (res.ok && rzpOrder.success) {
-        setRazorpayOrderData(rzpOrder);
-        // Automatically open Razorpay modal
-        await triggerRazorpayCheckout(orderNumber, rzpOrder);
-      } else {
-        console.warn('Backend order creation error, falling back to direct Razorpay client launch:', rzpOrder);
-        // Fallback: Launch directly with key & amount
-        const fallbackOrder = { amount: Math.round(total * 100), currency: 'INR', key_id: RAZORPAY_KEY_ID };
-        setRazorpayOrderData(fallbackOrder);
-        await triggerRazorpayCheckout(orderNumber, fallbackOrder);
-      }
-    } catch (err) {
-      console.error('Create order network error:', err);
-      // Fallback
-      const fallbackOrder = { amount: Math.round(total * 100), currency: 'INR', key_id: RAZORPAY_KEY_ID };
-      setRazorpayOrderData(fallbackOrder);
-      await triggerRazorpayCheckout(orderNumber, fallbackOrder);
-    } finally {
-      setSubmitting(false);
-    }
+    // Immediately trigger Razorpay pop-up window upon user tap
+    await triggerRazorpayCheckout(orderNumber, total);
   };
 
   const formatTimer = (secs) => {
@@ -874,7 +840,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
               {/* Pay Now Button */}
               <button
                 type="button"
-                onClick={() => triggerRazorpayCheckout(orderRef, razorpayOrderData)}
+                onClick={() => triggerRazorpayCheckout(orderRef, total)}
                 disabled={submitting}
                 className="btn btn-primary"
                 style={{

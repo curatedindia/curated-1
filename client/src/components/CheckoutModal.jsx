@@ -16,7 +16,7 @@ import {
 import confetti from 'canvas-confetti';
 import supabase from '../supabaseClient';
 
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
 
 function loadRazorpaySdk() {
   return new Promise((resolve) => {
@@ -202,45 +202,21 @@ export default function CheckoutModal({
     setPaymentStatusMsg({ text: 'Initializing secure Razorpay gateway...', type: 'info' });
 
     const sdkLoaded = await loadRazorpaySdk();
-    if (!sdkLoaded) {
+    if (!sdkLoaded || !window.Razorpay) {
       setErrorMessage('Failed to load Razorpay payment gateway. Please check your internet connection.');
       setLoading(false);
       return;
     }
 
-    let rzpOrderId = null;
-    try {
-      const res = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Math.round(payableAmount * 100),
-          currency: 'INR',
-          receipt: orderRef,
-          notes: {
-            order_number: orderRef,
-            customer_name: shippingDetails.name,
-            customer_email: shippingDetails.email,
-            customer_mobile: shippingDetails.mobile
-          }
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        rzpOrderId = data.id;
-        setRazorpayOrderData(data);
-      }
-    } catch (orderErr) {
-      console.warn('Backend Razorpay order creation notice:', orderErr);
-    }
+    const key = RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
+    const amountInPaise = Math.round(payableAmount * 100);
 
     const options = {
-      key: RAZORPAY_KEY_ID,
-      amount: Math.round(payableAmount * 100),
+      key: key,
+      amount: amountInPaise,
       currency: 'INR',
       name: 'CURATED',
       description: `Order #${orderRef} - Archival Garment`,
-      order_id: rzpOrderId || undefined,
       prefill: {
         name: shippingDetails.name || '',
         email: shippingDetails.email || '',
