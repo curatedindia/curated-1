@@ -16,7 +16,7 @@ import {
 import confetti from 'canvas-confetti';
 import supabase from '../supabaseClient';
 
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 function loadRazorpaySdk() {
   return new Promise((resolve) => {

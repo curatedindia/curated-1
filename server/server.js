@@ -17,9 +17,9 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
 const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
-// Razorpay Payment Gateway Configuration
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'RfXLp9TCNuZYEPdDsFZpB3R3';
+// Razorpay Payment Gateway Configuration (Secrets loaded securely from environment)
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));

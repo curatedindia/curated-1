@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'RfXLp9TCNuZYEPdDsFZpB3R3';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
 function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json');
@@ -124,3 +124,4 @@ export default async function handler(req, res) {
     return sendJson(res, 500, { success: false, message: err.message || 'Error verifying Razorpay payment' });
   }
 }
+
