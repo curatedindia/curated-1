@@ -135,11 +135,11 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Launch Razorpay Checkout Popup immediately
+  // Launch Razorpay Checkout Popup with valid Order ID
   const triggerRazorpayCheckout = async (orderRef, customAmount = null) => {
     setSubmitting(true);
     setErrorMessage('');
-    setPaymentStatusMsg({ text: 'Opening secure Razorpay payment window...', type: 'info' });
+    setPaymentStatusMsg({ text: 'Initializing secure Razorpay payment window...', type: 'info' });
 
     const sdkLoaded = await loadRazorpaySdk();
     if (!sdkLoaded || !window.Razorpay) {
@@ -161,12 +161,43 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     const amountInPaise = Math.round(payableAmount * 100);
     const key = RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
 
+    // 1. Create order on server to obtain mandatory Razorpay order_id
+    let rzpOrderId = null;
+    try {
+      const res = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: payableAmount,
+          currency: 'INR',
+          receipt: orderRef,
+          notes: {
+            order_number: orderRef,
+            customer_name: shippingDetails.name,
+            customer_email: shippingDetails.email,
+            customer_mobile: shippingDetails.mobile
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order_id) {
+          rzpOrderId = data.order_id;
+          setRazorpayOrderData(data);
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Backend order creation notice:', apiErr);
+    }
+
     const options = {
       key: key,
       amount: amountInPaise,
       currency: 'INR',
       name: 'CURATED',
       description: `Order #${orderRef} • 1-of-1 Archival Piece`,
+      ...(rzpOrderId ? { order_id: rzpOrderId } : {}),
       image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23121212"/><text x="16" y="21" font-family="sans-serif" font-size="16" font-weight="900" fill="%23FFFFFF" text-anchor="middle">C</text></svg>',
       prefill: {
         name: shippingDetails.name || profile?.fullName || '',
@@ -210,7 +241,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             payment_mode: 'RAZORPAY',
             gateway_id: response.razorpay_payment_id,
             gateway_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id || '',
+            razorpay_order_id: response.razorpay_order_id || rzpOrderId || '',
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature || '',
             items: cartItems.map((it) => ({
@@ -226,7 +257,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
             shipping_address: {
               ...shippingDetails,
               payment_mode: 'RAZORPAY',
-              razorpay_order_id: response.razorpay_order_id || '',
+              razorpay_order_id: response.razorpay_order_id || rzpOrderId || '',
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature || ''
             },

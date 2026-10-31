@@ -211,12 +211,43 @@ export default function CheckoutModal({
     const key = RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
     const amountInPaise = Math.round(payableAmount * 100);
 
+    // 1. Create order on server to obtain mandatory Razorpay order_id
+    let rzpOrderId = null;
+    try {
+      const res = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: payableAmount,
+          currency: 'INR',
+          receipt: orderRef,
+          notes: {
+            order_number: orderRef,
+            customer_name: shippingDetails.name,
+            customer_email: shippingDetails.email,
+            customer_mobile: shippingDetails.mobile
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order_id) {
+          rzpOrderId = data.order_id;
+          setRazorpayOrderData(data);
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Backend order creation notice:', apiErr);
+    }
+
     const options = {
       key: key,
       amount: amountInPaise,
       currency: 'INR',
       name: 'CURATED',
       description: `Order #${orderRef} - Archival Garment`,
+      ...(rzpOrderId ? { order_id: rzpOrderId } : {}),
       prefill: {
         name: shippingDetails.name || '',
         email: shippingDetails.email || '',
