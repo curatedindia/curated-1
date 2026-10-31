@@ -3,21 +3,35 @@ import {
   X,
   ShieldCheck,
   CreditCard,
-  QrCode,
-  Smartphone,
   Lock,
   Clock,
   AlertTriangle,
   CheckCircle,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Smartphone,
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { QRCodeSVG } from 'qrcode.react';
 import supabase from '../supabaseClient';
 
-const ADMIN_UPI_ID = 'nikhilpole90-2@okicici';
-const ADMIN_NAME = 'Nikhil Pole';
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
+
+function loadRazorpaySdk() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export default function CheckoutModal({
   isOpen,
@@ -41,11 +55,9 @@ export default function CheckoutModal({
     pincode: ''
   });
 
-  // Dynamic UPI Payment & UTR Verification state
-  const [utrInput, setUtrInput] = useState('');
-  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
+  // Razorpay payment state
+  const [razorpayOrderData, setRazorpayOrderData] = useState(null);
   const [paymentStatusMsg, setPaymentStatusMsg] = useState({ text: '', type: '' });
-  const [copiedUpi, setCopiedUpi] = useState(false);
 
   // When the modal mounts or when a Supabase Auth session is detected:
   useEffect(() => {
@@ -143,8 +155,8 @@ export default function CheckoutModal({
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Step 1: Proceed to Payment Gateway (Keep in client state/localStorage without saving to DB)
-  const handleProceedToPayment = (e) => {
+  // Step 1: Proceed to Payment Gateway & trigger Razorpay checkout
+  const handleProceedToPayment = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -182,227 +194,184 @@ export default function CheckoutModal({
     setHoldExpiresAt(expiresAt);
     setHoldSecondsLeft(600);
     setStep('GATEWAY');
-    setLoading(false);
+    await triggerRazorpayCheckout(orderNumber, total, formData);
   };
 
-  // Step 2: Confirm Payment through Gateway Simulator
-  const handleConfirmPayment = async (simulateLate = false) => {
-    if (!currentOrder) return;
+  const triggerRazorpayCheckout = async (orderRef, payableAmount, shippingDetails) => {
     setLoading(true);
-    setErrorMessage('');
+    setPaymentStatusMsg({ text: 'Initializing secure Razorpay gateway...', type: 'info' });
 
-    try {
-      const res = await fetch(`/api/orders/${currentOrder.id}/confirm-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gateway_payment_id: `pay_ind_${Date.now()}`,
-          payment_mode: selectedPaymentTab,
-          simulate_late: simulateLate
-        })
-      });
-      const data = await res.json();
-
-      if (data.edge_case === 'LATE_PAYMENT_ITEM_UNAVAILABLE') {
-        setCurrentOrder(data.order);
-        setStep('LATE_REFUND');
-        setLoading(false);
-        return;
-      }
-
-      if (!res.ok || !data.success) {
-        setErrorMessage(data.message || 'Payment verification failed.');
-        setStep('FAILED');
-        setLoading(false);
-        return;
-      }
-
-      // Success!
-      setCurrentOrder(data.order);
-      setStep('CONFIRMED');
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      onOrderSuccess();
-    } catch (err) {
-      setErrorMessage('Payment verification error.');
-      setStep('FAILED');
-    } finally {
+    const sdkLoaded = await loadRazorpaySdk();
+    if (!sdkLoaded) {
+      setErrorMessage('Failed to load Razorpay payment gateway. Please check your internet connection.');
       setLoading(false);
-    }
-  };
-
-  // Step 2b: Handle UTR submission and automated verification polling
-  const handleUtrSubmit = async (e) => {
-    e.preventDefault();
-    const cleanUtr = utrInput.trim();
-    if (!cleanUtr || cleanUtr.length !== 12) {
-      setPaymentStatusMsg({
-        text: 'Please enter a valid 12-digit numeric UTR/Ref No.',
-        type: 'error'
-      });
       return;
     }
 
-    setIsVerifyingUtr(true);
-    setPaymentStatusMsg({
-      text: 'Checking payment status...',
-      type: 'info'
-    });
-
-    const orderRef = currentOrder?.order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    // Retrieve shipping details from state or localStorage
-    let shippingDetails = formData;
+    let rzpOrderId = null;
     try {
-      const savedShipping = localStorage.getItem('checkout_shipping');
-      if (savedShipping) {
-        shippingDetails = { ...formData, ...JSON.parse(savedShipping) };
-      }
-    } catch (e) {
-      // fallback to state
-    }
-
-    // Function to create order in database ONLY after verification succeeds
-    const createVerifiedOrder = async () => {
-      const orderPayload = {
-        order_number: orderRef,
-        customer_name: shippingDetails.name || authUser?.user_metadata?.full_name || 'Customer',
-        customer_email: shippingDetails.email || authUser?.email || 'customer@example.com',
-        customer: shippingDetails,
-        total_amount: total,
-        total: total,
-        status: 'PENDING',
-        payment_status: 'PAID',
-        payment_mode: 'UPI',
-        utr: cleanUtr,
-        gateway_payment_id: cleanUtr,
-        items: cartItems.map((it) => ({
-          product_id: it.id || it.product_id,
-          name: it.name || it.title,
-          sku: it.sku || 'CUR-ITEM',
-          size: it.size || 'One Size',
-          price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
-          unit_price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
-          delivery_charge: parseFloat(it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0)) || 0,
-          quantity: parseInt(it.quantity, 10) || 1
-        })),
-        shipping_address: {
-          ...shippingDetails,
-          utr: cleanUtr,
-          payment_mode: 'UPI'
-        },
-        created_at: new Date().toISOString()
-      };
-
-      // 1. Direct Supabase insert with schema-compliant columns ONLY
-      try {
-        const supabasePayload = {
-          order_number: orderRef,
-          customer_name: orderPayload.customer_name,
-          customer_email: orderPayload.customer_email,
-          total_amount: total,
-          status: 'PENDING',
-          payment_status: 'PAID',
-          items: orderPayload.items,
-          shipping_address: orderPayload.shipping_address,
-          created_at: orderPayload.created_at
-        };
-
-        const { data: insertedData, error: insertError } = await supabase
-          .from('orders')
-          .insert([supabasePayload])
-          .select();
-
-        if (insertError) {
-          console.error('[CheckoutModal] Supabase orders insert error:', insertError);
-        } else {
-          console.log('[CheckoutModal] Order synced to Supabase successfully:', insertedData);
-        }
-      } catch (err) {
-        console.error('[CheckoutModal] Supabase insert exception:', err);
-      }
-
-      // 2. Also POST to backend /api/orders/create for backup and server db sync
-      try {
-        await fetch('/api/orders/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderPayload)
-        });
-      } catch (err) {
-        console.warn('Backend order creation notice:', err);
-      }
-
-      try {
-        localStorage.removeItem('checkout_shipping');
-        localStorage.setItem('curated_last_order', JSON.stringify(orderPayload));
-        if (orderPayload.customer_email) {
-          localStorage.setItem('curated_customer_email', orderPayload.customer_email);
-        }
-        if (orderPayload.customer_name) {
-          localStorage.setItem('curated_customer_name', orderPayload.customer_name);
-        }
-      } catch (e) {}
-
-      return orderPayload;
-    };
-
-    const finalizeOrder = async () => {
-      setIsVerifyingUtr(false);
-      setPaymentStatusMsg({
-        text: '✅ Payment Verified! Processing your order...',
-        type: 'success'
+      const res = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(payableAmount * 100),
+          currency: 'INR',
+          receipt: orderRef,
+          notes: {
+            order_number: orderRef,
+            customer_name: shippingDetails.name,
+            customer_email: shippingDetails.email,
+            customer_mobile: shippingDetails.mobile
+          }
+        })
       });
-
-      const createdOrder = await createVerifiedOrder();
-
-      setTimeout(() => {
-        setCurrentOrder(createdOrder);
-        setStep('CONFIRMED');
-        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-
-        setTimeout(() => {
-          if (onOrderSuccess) onOrderSuccess(createdOrder);
-        }, 2400);
-      }, 1200);
-    };
-
-    // 1. Poll /api/check-payment status, finalizing order upon verification
-    let attempts = 0;
-    const maxAttempts = 4;
-
-    const timer = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await fetch(`/api/check-payment?utr=${encodeURIComponent(cleanUtr)}&amount=${total}&orderId=${encodeURIComponent(orderRef)}`);
+      if (res.ok) {
         const data = await res.json();
+        rzpOrderId = data.id;
+        setRazorpayOrderData(data);
+      }
+    } catch (orderErr) {
+      console.warn('Backend Razorpay order creation notice:', orderErr);
+    }
 
-        if (data && data.status === 'VERIFIED') {
-          clearInterval(timer);
-          await finalizeOrder();
-        } else if (attempts >= maxAttempts) {
-          clearInterval(timer);
-          await finalizeOrder();
+    const options = {
+      key: RAZORPAY_KEY_ID,
+      amount: Math.round(payableAmount * 100),
+      currency: 'INR',
+      name: 'CURATED',
+      description: `Order #${orderRef} - Archival Garment`,
+      order_id: rzpOrderId || undefined,
+      prefill: {
+        name: shippingDetails.name || '',
+        email: shippingDetails.email || '',
+        contact: shippingDetails.mobile || ''
+      },
+      theme: {
+        color: '#121212'
+      },
+      modal: {
+        confirm_close: true,
+        ondismiss: function () {
+          setLoading(false);
+          setPaymentStatusMsg({
+            text: 'Payment window was closed. Click below to complete your payment before the hold expires.',
+            type: 'warning'
+          });
         }
-      } catch (err) {
-        console.error('Polling error:', err);
-        if (attempts >= maxAttempts) {
-          clearInterval(timer);
-          await finalizeOrder();
+      },
+      handler: async function (response) {
+        setLoading(true);
+        setPaymentStatusMsg({ text: 'Verifying payment with bank servers...', type: 'info' });
+
+        try {
+          const orderPayload = {
+            order_number: orderRef,
+            customer_name: shippingDetails.name || authUser?.user_metadata?.full_name || 'Customer',
+            customer_email: shippingDetails.email || authUser?.email || 'customer@example.com',
+            customer: shippingDetails,
+            total_amount: payableAmount,
+            total: payableAmount,
+            status: 'PENDING',
+            payment_status: 'PAID',
+            payment_mode: 'RAZORPAY',
+            gateway_id: response.razorpay_payment_id,
+            gateway_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            items: cartItems.map((it) => ({
+              product_id: it.id || it.product_id,
+              name: it.name || it.title,
+              sku: it.sku || 'CUR-ITEM',
+              size: it.size || 'One Size',
+              price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
+              unit_price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
+              delivery_charge: parseFloat(it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0)) || 0,
+              quantity: parseInt(it.quantity, 10) || 1
+            })),
+            shipping_address: {
+              ...shippingDetails,
+              payment_mode: 'RAZORPAY',
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            },
+            created_at: new Date().toISOString()
+          };
+
+          // 1. Direct Supabase insert/upsert
+          try {
+            const supabasePayload = {
+              order_number: orderRef,
+              customer_name: orderPayload.customer_name,
+              customer_email: orderPayload.customer_email,
+              total_amount: payableAmount,
+              status: 'PENDING',
+              payment_status: 'PAID',
+              items: orderPayload.items,
+              shipping_address: orderPayload.shipping_address,
+              created_at: orderPayload.created_at
+            };
+
+            await supabase
+              .from('orders')
+              .upsert([supabasePayload], { onConflict: 'order_number' });
+          } catch (sbErr) {
+            console.warn('[CheckoutModal] Supabase sync notice:', sbErr);
+          }
+
+          // 2. Call backend verification endpoint
+          try {
+            await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(orderPayload)
+            });
+          } catch (srvErr) {
+            console.warn('[CheckoutModal] Backend verify notice:', srvErr);
+          }
+
+          // 3. Persist order details to localStorage
+          try {
+            localStorage.removeItem('checkout_shipping');
+            localStorage.setItem('curated_last_order', JSON.stringify(orderPayload));
+            if (orderPayload.customer_email) {
+              localStorage.setItem('curated_customer_email', orderPayload.customer_email);
+            }
+            if (orderPayload.customer_name) {
+              localStorage.setItem('curated_customer_name', orderPayload.customer_name);
+            }
+          } catch (e) {}
+
+          // 4. Mark success & show celebration
+          setLoading(false);
+          setPaymentStatusMsg({ text: '✅ Payment Verified! Processing your order...', type: 'success' });
+          setCurrentOrder(orderPayload);
+          setStep('CONFIRMED');
+          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+
+          setTimeout(() => {
+            if (onOrderSuccess) onOrderSuccess(orderPayload);
+          }, 2000);
+        } catch (err) {
+          console.error('[CheckoutModal] Handler error:', err);
+          setErrorMessage('Payment was charged but order could not be synced. Please contact support.');
+          setLoading(false);
         }
       }
-    }, 1800);
-  };
+    };
 
-  const handleCopyUpi = () => {
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(ADMIN_UPI_ID);
-      setCopiedUpi(true);
-      setTimeout(() => setCopiedUpi(false), 2000);
-    }
+    const rzp = new window.Razorpay(options);
+    rzp.on('payment.failed', function (resp) {
+      setPaymentStatusMsg({
+        text: `Payment failed: ${resp.error?.description || 'Transaction declined'}`,
+        type: 'error'
+      });
+      setLoading(false);
+    });
+    rzp.open();
+    setStep('GATEWAY');
+    setLoading(false);
   };
 
   const formatTimer = (secs) => {
@@ -721,145 +690,112 @@ export default function CheckoutModal({
               </div>
             </div>
 
-            {/* STEP 2: DYNAMIC UPI QR GATEWAY */}
+            {/* STEP 2: RAZORPAY PAYMENT GATEWAY */}
             {(() => {
               const cartAmountFormatted = Number(total || 0).toFixed(2);
               const orderRef = currentOrder?.order_number || currentOrder?.id || `ORD-${Date.now()}`;
-              const upiDeepLink = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=${encodeURIComponent(ADMIN_NAME)}&am=${cartAmountFormatted}&cu=INR&tn=${encodeURIComponent('Order ' + orderRef)}`;
 
               return (
                 <div style={{ textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px', fontFamily: 'var(--font-heading)' }}>
-                    Scan &amp; Pay
-                  </h3>
-                  <p style={{ fontSize: '14px', margin: '0 0 14px', color: '#121212' }}>
-                    Total Cart Amount: <strong>₹<span id="cart-amount">{cartAmountFormatted}</span></strong>
-                  </p>
-
-                  {/* Container where JS renders the Admin's QR */}
-                  <div id="qrcode-container" style={{
-                    margin: '10px auto 14px',
-                    display: 'inline-block',
-                    padding: '14px',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '8px',
-                    border: '1px solid #E4E4E7',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: '#F4F4F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px'
                   }}>
-                    <QRCodeSVG
-                      value={upiDeepLink}
-                      size={200}
-                      level="H"
-                      includeMargin={false}
-                    />
+                    <CreditCard size={24} color="#121212" />
                   </div>
 
-                  <p style={{ fontSize: '12px', color: '#666', margin: '0 0 12px' }}>
-                    Amount is locked. Scan with GPay, PhonePe, or Paytm.
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px', fontFamily: 'var(--font-heading)' }}>
+                    Complete Your Payment
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#71717A', margin: '0 0 16px' }}>
+                    Order #{orderRef} • Locked 1-of-1 Piece
                   </p>
 
-                  {/* Admin UPI Details Badge with Copy button */}
-                  <div
-                    onClick={handleCopyUpi}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '6px 14px',
-                      backgroundColor: '#F4F4F5',
-                      border: '1px solid #E4E4E7',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: '#121212',
-                      marginBottom: '16px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <span>UPI ID: <strong>{ADMIN_UPI_ID}</strong></span>
-                    <span style={{ fontSize: '11px', color: '#71717A', textDecoration: 'underline' }}>
-                      {copiedUpi ? 'COPIED ✓' : 'COPY'}
+                  {/* Order Amount Card */}
+                  <div style={{
+                    backgroundColor: '#FAFAFA',
+                    border: '1px solid #E4E4E7',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
+                    marginBottom: '16px',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: '#71717A' }}>Customer</span>
+                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#121212' }}>{formData.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: '#71717A' }}>Deliver To</span>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#121212' }}>{formData.city}, {formData.pincode}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E4E4E7', paddingTop: '8px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#121212' }}>Total Payable Amount</span>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: '#121212', fontFamily: 'var(--font-heading)' }}>
+                        ₹{cartAmountFormatted}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment Methods Badges */}
+                  <div style={{
+                    padding: '10px 14px',
+                    backgroundColor: '#F0FDF4',
+                    border: '1px solid #BBF7D0',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '16px',
+                    textAlign: 'left'
+                  }}>
+                    <ShieldCheck size={18} color="#15803D" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', color: '#166534', lineHeight: 1.4 }}>
+                      Instant verification via <strong>UPI</strong> (GPay, PhonePe, Paytm), <strong>Cards</strong>, <strong>NetBanking</strong>, &amp; <strong>Wallets</strong>.
                     </span>
                   </div>
 
-                  {/* Direct Tap for Mobile Devices */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <a
-                      href={upiDeepLink}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        minHeight: '44px',
-                        backgroundColor: '#F4F4F5',
-                        color: '#121212',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        letterSpacing: '0.04em',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <Smartphone size={16} />
-                      <span>TAP TO PAY IN UPI APP (MOBILE)</span>
-                    </a>
-                  </div>
-
-                  <hr style={{ border: 'none', borderTop: '1px solid #E4E4E7', margin: '16px 0' }} />
-
-                  {/* Form for customer to enter UTR number after paying */}
-                  <form id="utr-form" onSubmit={handleUtrSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <label htmlFor="utr-input" style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.04em', color: '#121212' }}>
-                      ENTER 12-DIGIT UTR / REFERENCE NUMBER *
-                    </label>
-                    <input
-                      type="text"
-                      id="utr-input"
-                      placeholder="Enter 12-digit UTR/Ref No."
-                      maxLength={12}
-                      pattern="\d{12}"
-                      required
-                      value={utrInput}
-                      onChange={(e) => setUtrInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                      style={{
-                        padding: '10px 14px',
-                        width: '90%',
-                        maxWidth: '280px',
-                        textAlign: 'center',
-                        fontSize: '16px',
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        border: '1px solid #D4D4D8',
-                        borderRadius: '6px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      id="submit-btn"
-                      disabled={isVerifyingUtr || utrInput.length !== 12}
-                      style={{
-                        padding: '12px 24px',
-                        width: '90%',
-                        maxWidth: '280px',
-                        backgroundColor: utrInput.length === 12 ? '#28a745' : '#71717A',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        fontWeight: 800,
-                        letterSpacing: '0.04em',
-                        cursor: utrInput.length === 12 && !isVerifyingUtr ? 'pointer' : 'not-allowed',
-                        transition: 'background-color 0.2s ease',
-                        marginTop: '4px'
-                      }}
-                    >
-                      {isVerifyingUtr ? 'Verifying Bank Logs...' : 'Submit & Verify Order'}
-                    </button>
-                  </form>
+                  {/* Razorpay Launch Button */}
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => triggerRazorpayCheckout(orderRef, total, formData)}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: '#121212',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 800,
+                      letterSpacing: '0.06em',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'opacity 0.2s ease',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw size={16} className="spin-slow" />
+                        <span>PROCESSING RAZORPAY...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={15} />
+                        <span>PAY ₹{cartAmountFormatted} VIA RAZORPAY</span>
+                      </>
+                    )}
+                  </button>
 
                   {paymentStatusMsg.text && (
                     <p
@@ -867,7 +803,7 @@ export default function CheckoutModal({
                       style={{
                         fontWeight: 'bold',
                         marginTop: '14px',
-                        fontSize: '13px',
+                        fontSize: '12.5px',
                         color:
                           paymentStatusMsg.type === 'success'
                             ? '#28a745'

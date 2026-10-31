@@ -434,7 +434,7 @@ export default function OrdersView({
                     gap: '5px'
                   }}>
                     <CheckCircle2 size={13} />
-                    <span>PAID VIA UPI</span>
+                    <span>PAID VIA RAZORPAY</span>
                   </span>
 
                   <span style={{
@@ -639,15 +639,17 @@ export default function OrdersView({
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
                       <span style={{ color: '#71717A' }}>Payment Method:</span>
-                      <strong style={{ color: '#121212' }}>UPI (Direct VPA)</strong>
+                      <strong style={{ color: '#121212' }}>Razorpay (Secure)</strong>
                     </div>
-                    {currentOrder.shipping_address?.utr && (
+                    {(currentOrder.shipping_address?.razorpay_payment_id || currentOrder.gateway_id || currentOrder.shipping_address?.gateway_payment_id || currentOrder.shipping_address?.utr) && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
-                        <span style={{ color: '#71717A' }}>Bank UTR / Ref:</span>
+                        <span style={{ color: '#71717A' }}>Payment ID / Ref:</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{currentOrder.shipping_address.utr}</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                            {currentOrder.shipping_address?.razorpay_payment_id || currentOrder.gateway_id || currentOrder.shipping_address?.gateway_payment_id || currentOrder.shipping_address?.utr}
+                          </span>
                           <button
-                            onClick={() => handleCopyUtr(currentOrder.shipping_address.utr)}
+                            onClick={() => handleCopyUtr(currentOrder.shipping_address?.razorpay_payment_id || currentOrder.gateway_id || currentOrder.shipping_address?.gateway_payment_id || currentOrder.shipping_address?.utr)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#71717A' }}
                           >
                             <Copy size={13} />

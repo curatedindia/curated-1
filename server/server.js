@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { db, acquireLock, releaseLock } = require('./db');
 
@@ -16,13 +17,9 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
 const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
-// Admin UPI Configuration
-const ADMIN_UPI_ID = process.env.ADMIN_UPI_ID || 'nikhilpole90-2@okicici';
-const ADMIN_NAME = process.env.ADMIN_NAME || 'Nikhil Pole';
-const SHARED_SECRET_KEY = process.env.ADMIN_PHONE_SECRET_KEY || 'ADMIN_PHONE_SECRET_KEY_123';
-
-// Database storage array for automated logs forwarded from Admin's phone
-const receivedBankLogs = [];
+// Razorpay Payment Gateway Configuration
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'RfXLp9TCNuZYEPdDsFZpB3R3';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -729,90 +726,180 @@ app.post('/api/orders/:id/confirm-payment', async (req, res) => {
 });
 
 // ==========================================
-// UPI BANK WEBHOOK & PAYMENT VERIFICATION ROUTES
+// RAZORPAY PAYMENT GATEWAY ENDPOINTS
 // ==========================================
 
-// 1. WEBHOOK: Receives automated logs forwarded from Admin's phone
-app.post(['/api/bank-webhook', '/bank-webhook'], async (req, res) => {
-  const { secret, utr, amount } = req.body || {};
-
-  if (secret !== SHARED_SECRET_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (!utr || !amount) {
-    return res.status(400).json({ error: 'Missing utr or amount' });
-  }
-
-  const cleanUtr = String(utr).trim();
-  const parsedAmount = parseFloat(amount);
-
-  receivedBankLogs.push({
-    utr: cleanUtr,
-    amount: parsedAmount,
-    timestamp: new Date()
-  });
-
-  console.log(`[LOG RECEIVED] UTR: ${cleanUtr} | Amount: ₹${parsedAmount}`);
-
-  // Automatically verify matching order if found
+// 1. CREATE RAZORPAY ORDER
+app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
   try {
-    const matchingOrder = db.data.orders.find(
-      (o) => (o.utr === cleanUtr || o.gateway_id === cleanUtr)
-    );
-    if (matchingOrder && matchingOrder.payment_status !== 'PAID') {
-      matchingOrder.payment_status = 'PAID';
-      matchingOrder.order_status = 'CONFIRMED';
-      db.save();
+    const { amount, currency = 'INR', receipt, notes } = req.body || {};
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid order amount' });
+    }
 
-      if (supabaseAdmin) {
-        await supabaseAdmin
+    const amountInPaise = Math.round(parsedAmount * 100);
+    const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+
+    const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: amountInPaise,
+        currency,
+        receipt: receipt || `rcpt_${Date.now()}`,
+        notes: notes || {}
+      })
+    });
+
+    const rzpData = await rzpRes.json();
+    if (!rzpRes.ok) {
+      console.error('[Razorpay Order Creation Error]:', rzpData);
+      return res.status(rzpRes.status).json({
+        success: false,
+        message: rzpData.error?.description || 'Failed to create Razorpay order',
+        error: rzpData.error
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      order_id: rzpData.id,
+      amount: rzpData.amount,
+      currency: rzpData.currency,
+      key_id: RAZORPAY_KEY_ID
+    });
+  } catch (err) {
+    console.error('[Razorpay Order Create Exception]:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error creating Razorpay order' });
+  }
+});
+
+// 2. VERIFY RAZORPAY PAYMENT & CONFIRM ORDER
+app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      order_number,
+      customer_name,
+      customer_email,
+      customer,
+      items,
+      total_amount,
+      total,
+      shipping_address
+    } = req.body || {};
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ success: false, message: 'Missing Razorpay payment parameters.' });
+    }
+
+    // Verify HMAC SHA256 Signature
+    const hmac = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET);
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const generated_signature = hmac.digest('hex');
+
+    if (generated_signature !== razorpay_signature) {
+      console.error('[Razorpay Signature Mismatch]:', { generated: generated_signature, received: razorpay_signature });
+      return res.status(400).json({ success: false, message: 'Payment verification failed: Invalid signature' });
+    }
+
+    console.log(`[RAZORPAY VERIFIED] Payment ID: ${razorpay_payment_id} | Order ID: ${razorpay_order_id}`);
+
+    const finalOrderNumber = order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalTotal = Number(total_amount || total || 0);
+
+    const newOrder = {
+      id: `ord-${Date.now()}`,
+      order_number: finalOrderNumber,
+      customer_name: customer_name || customer?.name || 'Customer',
+      customer_email: customer_email || customer?.email || 'customer@example.com',
+      customer: customer || shipping_address || {},
+      total_amount: finalTotal,
+      total: finalTotal,
+      status: 'PENDING',
+      order_status: 'CONFIRMED',
+      payment_status: 'PAID',
+      payment_mode: 'RAZORPAY',
+      gateway_id: razorpay_payment_id,
+      gateway_payment_id: razorpay_payment_id,
+      razorpay_order_id,
+      razorpay_payment_id,
+      items: items || [],
+      shipping_address: {
+        ...(shipping_address || customer || {}),
+        payment_mode: 'RAZORPAY',
+        razorpay_order_id,
+        razorpay_payment_id
+      },
+      created_at: new Date().toISOString()
+    };
+
+    // Update in-memory db
+    const existing = db.data.orders.find((o) => o.order_number === finalOrderNumber);
+    if (!existing) {
+      db.data.orders.unshift(newOrder);
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          const prod = db.data.products?.find((p) => p.id === item.product_id);
+          if (prod) {
+            prod.pieces_sold = (prod.pieces_sold || 0) + (item.quantity || 1);
+            if (prod.total_available !== undefined) {
+              prod.total_available = Math.max(0, prod.total_available - (item.quantity || 1));
+              if (prod.total_available === 0) {
+                prod.status = 'SOLD_OUT';
+                prod.sold_at = new Date().toISOString();
+              }
+            }
+          }
+        }
+      }
+      db.save();
+    }
+
+    // Sync to Supabase orders table
+    if (supabaseAdmin) {
+      try {
+        const supabasePayload = {
+          order_number: finalOrderNumber,
+          customer_name: newOrder.customer_name,
+          customer_email: newOrder.customer_email,
+          total_amount: finalTotal,
+          status: 'PENDING',
+          payment_status: 'PAID',
+          items: newOrder.items,
+          shipping_address: newOrder.shipping_address,
+          created_at: newOrder.created_at
+        };
+
+        const { error: sbErr } = await supabaseAdmin
           .from('orders')
-          .update({ status: 'PENDING', payment_status: 'PAID' })
-          .eq('order_number', matchingOrder.order_number);
+          .upsert([supabasePayload], { onConflict: 'order_number' });
+
+        if (sbErr) console.warn('[Supabase Sync Warning]:', sbErr.message);
+      } catch (err) {
+        console.warn('[Supabase Sync Exception]:', err.message);
       }
     }
+
+    return res.status(200).json({
+      success: true,
+      verified: true,
+      message: 'Payment verified and order confirmed successfully',
+      order: newOrder
+    });
   } catch (err) {
-    console.error('[Bank Webhook Match Sync Error]:', err.message);
+    console.error('[Razorpay Verify Error]:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Error verifying Razorpay payment' });
   }
-
-  return res.status(200).json({ status: 'SUCCESS' });
 });
 
-// 2. CHECK STATUS: Hit by frontend client polling
-app.get(['/api/check-payment', '/check-payment'], (req, res) => {
-  const { utr, amount, orderId } = req.query || {};
-
-  const cleanUtr = String(utr || '').trim();
-  const parsedAmount = parseFloat(amount);
-
-  const match = receivedBankLogs.find(
-    (log) => log.utr === cleanUtr && (isNaN(parsedAmount) || Math.abs(log.amount - parsedAmount) < 1)
-  );
-
-  if (match) {
-    return res.json({ status: 'VERIFIED' });
-  }
-
-  // If order is already paid, report VERIFIED
-  if (orderId) {
-    const order = db.data.orders.find(
-      (o) => o.id === orderId || o.order_number === orderId
-    );
-    if (order && (order.payment_status === 'PAID' || order.order_status === 'CONFIRMED')) {
-      return res.json({ status: 'VERIFIED' });
-    }
-  }
-
-  // When customer enters a valid 12-digit numeric UTR, verify payment
-  if (cleanUtr && /^\d{12}$/.test(cleanUtr)) {
-    return res.json({ status: 'VERIFIED' });
-  }
-
-  return res.json({ status: 'PENDING' });
-});
-
-// 3. CREATE ORDER: Triggered when payment is verified
+// 3. CREATE ORDER (Direct sync endpoint)
 app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
   try {
     const {
@@ -823,9 +910,12 @@ app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
       total_amount,
       total,
       payment_status,
+      payment_mode,
+      gateway_payment_id,
+      razorpay_payment_id,
+      razorpay_order_id,
       items,
-      shipping_address,
-      utr
+      shipping_address
     } = req.body || {};
 
     const finalOrderNumber = order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -843,47 +933,47 @@ app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
       status: 'PENDING',
       order_status: 'CONFIRMED',
       payment_status: finalPaymentStatus,
-      payment_mode: 'UPI',
-      utr: utr || null,
+      payment_mode: payment_mode || 'RAZORPAY',
+      gateway_id: razorpay_payment_id || gateway_payment_id || null,
+      gateway_payment_id: razorpay_payment_id || gateway_payment_id || null,
+      razorpay_order_id: razorpay_order_id || null,
+      razorpay_payment_id: razorpay_payment_id || null,
       items: items || [],
       shipping_address: shipping_address || customer || {},
       created_at: new Date().toISOString()
     };
 
-    // 1. Add to local db if not existing
     const existing = db.data.orders.find((o) => o.order_number === finalOrderNumber);
     if (!existing) {
       db.data.orders.unshift(newOrder);
       db.save();
     }
 
-    // 2. Also ensure inserted into Supabase
-    try {
-      const supabasePayload = {
-        order_number: finalOrderNumber,
-        customer_name: newOrder.customer_name,
-        customer_email: newOrder.customer_email,
-        total_amount: finalTotal,
-        status: 'PENDING',
-        payment_status: finalPaymentStatus,
-        items: newOrder.items,
-        shipping_address: newOrder.shipping_address,
-        created_at: newOrder.created_at
-      };
+    if (supabaseAdmin) {
+      try {
+        const supabasePayload = {
+          order_number: finalOrderNumber,
+          customer_name: newOrder.customer_name,
+          customer_email: newOrder.customer_email,
+          total_amount: finalTotal,
+          status: 'PENDING',
+          payment_status: finalPaymentStatus,
+          items: newOrder.items,
+          shipping_address: newOrder.shipping_address,
+          created_at: newOrder.created_at
+        };
 
-      if (supabase) {
-        const { error: sbErr } = await supabase
+        await supabaseAdmin
           .from('orders')
           .upsert([supabasePayload], { onConflict: 'order_number' });
-        if (sbErr) console.warn('[Server Orders Supabase Sync Warning]:', sbErr.message);
+      } catch (err) {
+        console.warn('[Server Orders Supabase Sync Error]:', err.message);
       }
-    } catch (err) {
-      console.warn('[Server Orders Supabase Sync Error]:', err.message);
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Order created with verified payment',
+      message: 'Order created successfully',
       order: newOrder
     });
   } catch (err) {
