@@ -18,7 +18,7 @@ import confetti from 'canvas-confetti';
 import supabase from '../supabaseClient';
 import { useCheckoutAuth } from '../hooks/useCheckoutAuth';
 
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 function loadRazorpaySdk() {
   return new Promise((resolve) => {
@@ -159,10 +159,10 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
 
     const payableAmount = customAmount !== null ? customAmount : total;
     const amountInPaise = Math.round(payableAmount * 100);
-    const key = RAZORPAY_KEY_ID || 'rzp_test_TuZkYc8hwiX2q1';
 
-    // 1. Create order on server to obtain mandatory Razorpay order_id
+    // 1. Create order on server to obtain mandatory Razorpay order_id and key_id
     let rzpOrderId = null;
+    let serverKeyId = null;
     try {
       const res = await fetch('/api/razorpay/create-order', {
         method: 'POST',
@@ -184,12 +184,15 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
         const data = await res.json();
         if (data.order_id) {
           rzpOrderId = data.order_id;
+          serverKeyId = data.key_id;
           setRazorpayOrderData(data);
         }
       }
     } catch (apiErr) {
       console.warn('Backend order creation notice:', apiErr);
     }
+
+    const key = serverKeyId || RAZORPAY_KEY_ID;
 
     const options = {
       key: key,
