@@ -27,7 +27,7 @@ const CART_STORAGE_KEY = 'curated_cart';
  * 3. Preserves items in the cart (specifically the Pigment-Dyed French Terry Drop-Shoulder Hoodie)
  *    from localStorage across the OAuth redirect cycle.
  */
-export function useCheckoutAuth() {
+export function useCheckoutAuth(initialCart) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState({
@@ -38,8 +38,11 @@ export function useCheckoutAuth() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // 1. Preserve and retrieve cart items from localStorage
+  // 1. Preserve and retrieve cart items from initialCart or localStorage
   const [cartItems, setCartItems] = useState(() => {
+    if (Array.isArray(initialCart) && initialCart.length > 0) {
+      return initialCart;
+    }
     try {
       const stored = localStorage.getItem(CART_STORAGE_KEY);
       if (stored) {
@@ -54,6 +57,12 @@ export function useCheckoutAuth() {
     // Fallback: preserve the Hoodie piece if cart was newly initialized
     return [DEFAULT_HOODIE_ITEM];
   });
+
+  useEffect(() => {
+    if (Array.isArray(initialCart) && initialCart.length > 0) {
+      setCartItems(initialCart);
+    }
+  }, [initialCart]);
 
   // Keep localStorage synchronized whenever cartItems changes
   useEffect(() => {

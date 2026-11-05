@@ -35,7 +35,7 @@ function loadRazorpaySdk() {
   });
 }
 
-export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) {
+export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, cartItems: passedCartItems }) {
   const {
     user,
     profile,
@@ -47,7 +47,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
     loading: authLoading,
     authError,
     clearCart
-  } = useCheckoutAuth();
+  } = useCheckoutAuth(passedCartItems);
 
   const [step, setStep] = useState('FORM'); // 'FORM' | 'GATEWAY' | 'CONFIRMED' | 'FAILED'
   const [formData, setFormData] = useState({

@@ -8,12 +8,29 @@ export default function CartDrawer({
   cartItems,
   onRemoveItem,
   onProceedToCheckout,
-  settings
+  settings,
+  user
 }) {
   const [unavailableItemIds, setUnavailableItemIds] = useState([]);
   const [checkingStock, setCheckingStock] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [currentUser, setCurrentUser] = useState(user || null);
+
+  // Sync internal user state whenever user prop changes or drawer opens
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+    } else {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setCurrentUser(session.user);
+        } else {
+          setCurrentUser(null);
+        }
+      }).catch(() => {});
+    }
+  }, [user, isOpen]);
 
   // CK-02: Re-check stock availability whenever cart opens
   useEffect(() => {
@@ -252,18 +269,26 @@ export default function CartDrawer({
               onClick={async () => {
                 if (hasUnavailableItems || checkingStock) return;
 
-                // Ensure cart is saved in localStorage so it remains intact across OAuth redirect
+                // Ensure cart is saved in localStorage so it remains intact
                 try {
                   localStorage.setItem('curated_cart', JSON.stringify(cartItems));
                 } catch (e) {
                   console.error('Failed to sync cart:', e);
                 }
 
+                // If user is already authenticated: Proceed directly to checkout without OAuth prompt!
+                if (currentUser) {
+                  if (onProceedToCheckout) {
+                    onProceedToCheckout();
+                  }
+                  return;
+                }
+
+                // If user is in guest mode: Initiate Google OAuth to log in and redirect to checkout
                 setIsSigningIn(true);
                 setAuthError('');
 
                 try {
-                  // Trigger Supabase Google OAuth with redirect to /checkout
                   const { error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
@@ -298,6 +323,11 @@ export default function CartDrawer({
             >
               {isSigningIn ? (
                 <span>REDIRECTING TO GOOGLE...</span>
+              ) : currentUser ? (
+                <>
+                  <span>PROCEED TO CHECKOUT</span>
+                  <ArrowRight size={16} />
+                </>
               ) : (
                 <>
                   <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>

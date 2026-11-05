@@ -1074,6 +1074,7 @@ export default function App() {
               handleOrderSuccess(order);
             }}
             settings={settings}
+            cartItems={cartItems}
           />
         )}
 
@@ -1111,6 +1112,7 @@ export default function App() {
         onRemoveItem={handleRemoveFromCart}
         onProceedToCheckout={handleOpenCheckout}
         settings={settings}
+        user={authUser}
       />
 
       <CheckoutModal
