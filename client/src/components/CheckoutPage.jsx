@@ -433,13 +433,6 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
           >
             <ArrowLeft size={16} /> RETURN TO STORE
           </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Lock size={14} color="#121212" />
-            <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', color: '#121212' }}>
-              RAZORPAY 256-BIT ENCRYPTED CHECKOUT
-            </span>
-          </div>
         </div>
 
         {/* Google Authentication Status Banner */}
