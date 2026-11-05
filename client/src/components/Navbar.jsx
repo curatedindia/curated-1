@@ -177,17 +177,19 @@ export default function Navbar({
               </span>
             </button>
 
-            {/* Profile Menu Trigger (Right Corner) */}
-            <ProfileMenu
-              user={user}
-              onNavigateToOrders={() => {
-                if (onNavigateToOrders) onNavigateToOrders();
-                else handleNavClick('orders');
-              }}
-              onNavigateToTrack={() => handleNavClick('track-order')}
-              onLogout={onLogout}
-              onDeleteAccount={onDeleteAccount}
-            />
+            {/* Profile Menu Trigger (Right Corner) - Only visible when user leaves Guest Mode */}
+            {user && (
+              <ProfileMenu
+                user={user}
+                onNavigateToOrders={() => {
+                  if (onNavigateToOrders) onNavigateToOrders();
+                  else handleNavClick('orders');
+                }}
+                onNavigateToTrack={() => handleNavClick('track-order')}
+                onLogout={onLogout}
+                onDeleteAccount={onDeleteAccount}
+              />
+            )}
           </div>
         </div>
       </header>

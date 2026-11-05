@@ -18,42 +18,19 @@ export default function ProfileMenu({
   onLogout,
   onDeleteAccount
 }) {
+  if (!user) return null;
+
   const [isOpen, setIsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const menuRef = useRef(null);
 
-  // Extract user details
-  const meta = user?.user_metadata || {};
-  const email = user?.email || meta.email || (() => {
-    try {
-      return (
-        localStorage.getItem('curated_customer_email') ||
-        JSON.parse(localStorage.getItem('curated_last_order') || '{}')?.customer_email ||
-        ''
-      );
-    } catch {
-      return '';
-    }
-  })();
-
-  const displayName =
-    meta.full_name ||
-    meta.name ||
-    (() => {
-      try {
-        return (
-          localStorage.getItem('curated_customer_name') ||
-          JSON.parse(localStorage.getItem('curated_last_order') || '{}')?.customer_name ||
-          (email ? email.split('@')[0] : 'Patron')
-        );
-      } catch {
-        return email ? email.split('@')[0] : 'Patron';
-      }
-    })();
-
+  // Extract authenticated user details
+  const meta = user.user_metadata || {};
+  const email = user.email || meta.email || '';
+  const displayName = meta.full_name || meta.name || (email ? email.split('@')[0] : 'Member');
   const avatarUrl = meta.avatar_url || meta.picture || '';
-  const initialLetter = (displayName || email || 'C').charAt(0).toUpperCase();
+  const initialLetter = (displayName || email || 'M').charAt(0).toUpperCase();
 
   // Close when clicking outside on desktop
   useEffect(() => {
@@ -228,7 +205,7 @@ export default function ProfileMenu({
                 borderRadius: '4px',
                 marginTop: '4px'
               }}>
-                ✦ VERIFIED PATRON
+                ✦ VERIFIED BUYER
               </span>
             </div>
           </div>
@@ -452,7 +429,7 @@ export default function ProfileMenu({
                   borderRadius: '4px',
                   marginTop: '4px'
                 }}>
-                  ✦ VERIFIED PATRON
+                  ✦ VERIFIED BUYER
                 </span>
               </div>
             </div>

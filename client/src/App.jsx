@@ -383,6 +383,7 @@ export default function App() {
     try {
       localStorage.removeItem('curated_customer_email');
       localStorage.removeItem('curated_customer_name');
+      localStorage.removeItem('curated_last_order');
     } catch (e) {}
     setCurrentView('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
