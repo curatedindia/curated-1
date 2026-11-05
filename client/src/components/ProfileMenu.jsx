@@ -191,22 +191,11 @@ export default function ProfileMenu({
               <div style={{ fontSize: '14px', fontWeight: 800, color: '#121212', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {displayName}
               </div>
-              <div style={{ fontSize: '11px', color: '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
-                {email || 'Verified Buyer'}
-              </div>
-              <span style={{
-                display: 'inline-block',
-                fontSize: '9.5px',
-                fontWeight: 800,
-                letterSpacing: '0.04em',
-                color: '#15803D',
-                backgroundColor: '#DCFCE7',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                marginTop: '4px'
-              }}>
-                ✦ VERIFIED BUYER
-              </span>
+              {email && (
+                <div style={{ fontSize: '11px', color: '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
+                  {email}
+                </div>
+              )}
             </div>
           </div>
 
@@ -416,21 +405,11 @@ export default function ProfileMenu({
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#121212' }}>
                   {displayName}
                 </div>
-                <div style={{ fontSize: '12px', color: '#71717A', wordBreak: 'break-all', marginTop: '2px' }}>
-                  {email || 'Verified Patron'}
-                </div>
-                <span style={{
-                  display: 'inline-block',
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  color: '#15803D',
-                  backgroundColor: '#DCFCE7',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  marginTop: '4px'
-                }}>
-                  ✦ VERIFIED BUYER
-                </span>
+                {email && (
+                  <div style={{ fontSize: '12px', color: '#71717A', wordBreak: 'break-all', marginTop: '2px' }}>
+                    {email}
+                  </div>
+                )}
               </div>
             </div>
 

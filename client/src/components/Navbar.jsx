@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ShoppingBag, Search, Menu, X, ArrowRight, ShieldCheck, User } from 'lucide-react';
 import ProfileMenu from './ProfileMenu';
+import CuratedLogo from './CuratedLogo';
 
 export default function Navbar({
   currentView,
@@ -94,17 +95,7 @@ export default function Navbar({
                 alignItems: 'center'
               }}
             >
-              <span style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: 'clamp(20px, 4.5vw, 24px)',
-                fontWeight: 800,
-                letterSpacing: '0.14em',
-                color: '#121212',
-                lineHeight: 1,
-                textTransform: 'uppercase'
-              }}>
-                CURATED
-              </span>
+              <CuratedLogo size={32} hangerSize={20} showText={true} />
             </div>
 
             {/* Desktop Navigation Links */}

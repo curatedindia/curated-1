@@ -473,20 +473,6 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings }) 
                 </div>
               </div>
             </div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 10px',
-              backgroundColor: 'rgba(52, 168, 83, 0.1)',
-              border: '1px solid rgba(52, 168, 83, 0.3)',
-              borderRadius: '20px',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: '#2E7D32'
-            }}>
-              <CheckCircle size={13} /> VERIFIED BUYER PROFILE
-            </div>
           </div>
         )}
 

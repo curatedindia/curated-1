@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldAlert, ArrowRight } from 'lucide-react';
+import CuratedLogo from './CuratedLogo';
 
 const InstagramIcon = ({ size = 15, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -186,17 +187,8 @@ export default function Footer({ setCurrentView, setCategoryFilter, settings, on
 
           {/* Col 3: Brand Identity & Social */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <span style={{
-                fontSize: '20px',
-                fontWeight: 800,
-                letterSpacing: '0.14em',
-                color: '#FFFFFF',
-                fontFamily: 'var(--font-heading)',
-                textTransform: 'uppercase'
-              }}>
-                CURATED
-              </span>
+            <div style={{ marginBottom: '10px' }}>
+              <CuratedLogo size={28} hangerSize={18} showText={true} textColor="#FFFFFF" textSize="20px" />
             </div>
             <p style={{
               fontSize: '10.5px',
