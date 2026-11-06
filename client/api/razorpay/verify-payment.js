@@ -71,12 +71,15 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { success: false, message: 'Missing Razorpay verification parameters' });
     }
 
-    // Verify HMAC-SHA256 signature
+    // Verify HMAC-SHA256 signature using timing-safe comparison (CUR-SEC-07)
     const hmac = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET);
     hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const generated_signature = hmac.digest('hex');
 
-    if (generated_signature !== razorpay_signature) {
+    const genBuf = Buffer.from(generated_signature, 'utf8');
+    const recBuf = Buffer.from(razorpay_signature, 'utf8');
+
+    if (genBuf.length !== recBuf.length || !crypto.timingSafeEqual(genBuf, recBuf)) {
       console.error('[Razorpay Signature Mismatch Serverless]:', { generated: generated_signature, received: razorpay_signature });
       return sendJson(res, 400, { success: false, message: 'Payment verification failed: Invalid signature' });
     }

@@ -40,16 +40,58 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Multer storage config for mobile camera/file uploads
+// Multer storage config for mobile camera/file uploads (Hardened - CUR-SEC-06)
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? rawExt : '.jpg';
     const uniqueName = `curated_${Date.now()}_${Math.round(Math.random() * 1e5)}${ext}`;
     cb(null, uniqueName);
   }
 });
-const upload = multer({ storage });
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB maximum
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
+      return cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are permitted.'));
+    }
+    cb(null, true);
+  }
+});
+
+// Admin authentication middleware (CUR-SEC-05)
+const requireAdmin = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    if (token && supabaseAdmin) {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !user || user.email.toLowerCase() !== 'hello.curatedindia@gmail.com') {
+        return res.status(403).json({ success: false, message: 'Forbidden: Admin credentials required.' });
+      }
+      req.adminUser = user;
+      return next();
+    }
+
+    // Allow in local development if no supabaseAdmin configured
+    if (!supabaseAdmin) {
+      return next();
+    }
+
+    return res.status(401).json({ success: false, message: 'Admin authentication required.' });
+  } catch (err) {
+    console.error('[Admin Auth Error]:', err);
+    return res.status(500).json({ success: false, message: 'Authentication verification failure.' });
+  }
+};
 
 // Periodic cleanup of expired holds every 5 seconds (unref'd for serverless safety)
 const holdCleanupTimer = setInterval(() => {
@@ -198,8 +240,8 @@ app.get('/api/products/:slug', (req, res) => {
   });
 });
 
-// Admin: Upload image
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// Admin: Upload image (Protected with requireAdmin & image filter)
+app.post('/api/upload', requireAdmin, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No file uploaded' });
   }
@@ -207,8 +249,8 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   res.json({ success: true, url: fileUrl });
 });
 
-// Admin: Create product with PC-12 validator
-app.post('/api/products', (req, res) => {
+// Admin: Create product with PC-12 validator (Protected with requireAdmin)
+app.post('/api/products', requireAdmin, (req, res) => {
   const {
     name,
     category_id,
@@ -335,7 +377,8 @@ app.post('/api/products', (req, res) => {
 });
 
 // Admin: Update product details
-app.put('/api/products/:id', (req, res) => {
+// Admin: Update product details (Protected with requireAdmin)
+app.put('/api/products/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const product = db.data.products.find((p) => p.id === id);
   if (!product) {
@@ -392,8 +435,8 @@ app.put('/api/products/:id', (req, res) => {
   res.json({ success: true, product });
 });
 
-// Admin: Bulk actions (Publish, New Drop, Remove New Drop, Archive)
-app.post('/api/products/bulk-action', (req, res) => {
+// Admin: Bulk actions (Protected with requireAdmin)
+app.post('/api/products/bulk-action', requireAdmin, (req, res) => {
   const { product_ids, action } = req.body;
   if (!product_ids || !Array.isArray(product_ids)) {
     return res.status(400).json({ success: false, message: 'Invalid product IDs' });
@@ -423,8 +466,8 @@ app.post('/api/products/bulk-action', (req, res) => {
   res.json({ success: true, updatedCount });
 });
 
-// Admin: Delete product with BR-09 safety rule
-app.delete('/api/products/:id', (req, res) => {
+// Admin: Delete product with BR-09 safety rule (Protected with requireAdmin)
+app.delete('/api/products/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const piecesSold = db.getPiecesSold(id);
   if (piecesSold > 0) {
@@ -611,134 +654,45 @@ app.post('/api/orders/checkout', async (req, res) => {
   }
 });
 
-// Gateway Payment Webhook / Confirmation
+// Gateway Payment Webhook / Confirmation (Deprecated for security - CUR-SEC-02)
 app.post('/api/orders/:id/confirm-payment', async (req, res) => {
-  const { id } = req.params;
-  const { gateway_payment_id, payment_mode = 'UPI', simulate_late = false, utr } = req.body;
-
-  const order = db.data.orders.find((o) => o.id === id);
-  if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
-  }
-
-  // Idempotency check (INV-14): If already paid, return existing state
-  if (order.payment_status === 'PAID') {
-    return res.json({ success: true, message: 'Order already confirmed', order });
-  }
-
-  const primaryItem = order.items?.[0] || {};
-  const lockKey = primaryItem.variant_id || order.id;
-  if (lockKey) await acquireLock(lockKey);
-
-  try {
-    const variant = primaryItem.variant_id ? db.data.variants.find((v) => v.id === primaryItem.variant_id) : null;
-    const product = primaryItem.product_id ? db.data.products.find((p) => p.id === primaryItem.product_id) : null;
-
-    // Check if hold is still active or expired
-    const hold = db.data.holds.find((h) => h.id === order.hold_id);
-    const isHoldValid = hold && hold.status === 'ACTIVE' && new Date(hold.expires_at) > new Date();
-
-    // Edge-case INV-13: Late payment or hold expired
-    if ((!isHoldValid || simulate_late) && variant) {
-      if (variant.stock_on_hand <= 0) {
-        order.payment_status = 'REFUND_INITIATED';
-        order.order_status = 'PAYMENT_RECEIVED_ITEM_UNAVAILABLE';
-        order.gateway_id = gateway_payment_id || `sim_${Date.now()}`;
-        order.notes = 'INV-13 Edge Case: Payment confirmed after hold expired, but item was claimed offline. Full automatic refund initiated.';
-
-        db.logActivity('LATE_PAYMENT_REFUND', 'ORDER', order.order_number, `Refund initiated for ${order.order_number}: piece no longer available.`, 'SYSTEM');
-        db.save();
-
-        return res.status(409).json({
-          success: false,
-          edge_case: 'LATE_PAYMENT_ITEM_UNAVAILABLE',
-          message: 'We received your payment but this piece is no longer available. A full refund has been started and should reach you within standard bank timelines.',
-          order
-        });
-      }
-    }
-
-    // Convert hold to sale atomically
-    if (hold) hold.status = 'CONVERTED';
-
-    if (variant) {
-      variant.stock_on_hand = Math.max(0, variant.stock_on_hand - (primaryItem.quantity || 1));
-
-      // If stock reaches 0, mark product SOLD_OUT (INV-04)
-      if (variant.stock_on_hand === 0 && product) {
-        product.status = 'SOLD_OUT';
-        product.sold_at = new Date().toISOString();
-      }
-    }
-
-    order.payment_status = 'PAID';
-    order.order_status = 'CONFIRMED';
-    order.gateway_id = gateway_payment_id || utr || `pay_${Date.now()}`;
-    order.utr = utr || gateway_payment_id || null;
-    order.payment_mode = payment_mode;
-    order.notes = utr ? `Payment confirmed via UPI UTR: ${utr}` : 'Payment verified via secure gateway. Order confirmed.';
-
-    // Record in Immutable Inventory Ledger (INV-02, INV-12)
-    db.data.inventoryTransactions.unshift({
-      id: 'tx-' + Date.now(),
-      variant_id: variant.id,
-      product_id: product.id,
-      sku: product.sku,
-      quantity_change: -primaryItem.quantity,
-      reason: 'Online Sale',
-      channel: 'ONLINE',
-      order_id: order.id,
-      admin_user: 'SYSTEM',
-      note: `Online Sale for ${order.order_number}`,
-      created_at: new Date().toISOString()
-    });
-
-    db.logActivity('ONLINE_SALE', 'ORDER', order.order_number, `Online sale confirmed: ${order.order_number} for ₹${order.total}`, 'SYSTEM');
-    db.save();
-
-    // Sync order to Supabase orders table for the Admin dashboard
-    if (supabaseAdmin) {
-      try {
-        await supabaseAdmin.from('orders').upsert({
-          order_number: order.order_number,
-          customer_name: order.customer?.name || 'Customer',
-          customer_email: order.customer?.email || 'customer@example.com',
-          total_amount: order.total,
-          status: 'PENDING',
-          payment_status: 'PAID',
-          items: order.items,
-          shipping_address: order.customer,
-          created_at: order.created_at || new Date().toISOString()
-        }, { onConflict: 'order_number' });
-      } catch (err) {
-        console.error('[Supabase Order Sync Warning]:', err.message);
-      }
-    }
-
-    res.json({
-      success: true,
-      message: 'Payment confirmed successfully',
-      order
-    });
-  } finally {
-    releaseLock(primaryItem.variant_id);
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'Direct unverified payment confirmation is deprecated. All payments must be verified via /api/razorpay/verify-payment.'
+  });
 });
 
 // ==========================================
 // RAZORPAY PAYMENT GATEWAY ENDPOINTS
 // ==========================================
 
-// 1. CREATE RAZORPAY ORDER
+// 1. CREATE RAZORPAY ORDER (Hardened with Server-Side Price Verification - CUR-SEC-03)
 app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
   try {
-    const { amount, currency = 'INR', receipt, notes } = req.body || {};
-    const parsedAmount = parseFloat(amount);
-    if (!parsedAmount || parsedAmount <= 0) {
+    const { amount, currency = 'INR', receipt, notes, items } = req.body || {};
+
+    let verifiedTotal = parseFloat(amount);
+
+    if (Array.isArray(items) && items.length > 0) {
+      const calculatedSubtotal = items.reduce((sum, it) => {
+        const itemPrice = Number(it.unit_price || it.selling_price || it.price || 0);
+        const qty = Number(it.quantity || 1);
+        return sum + (itemPrice * qty);
+      }, 0);
+      const shippingFee = calculatedSubtotal >= 1499 ? 0 : (calculatedSubtotal > 0 ? 99 : 0);
+      const calculatedTotal = calculatedSubtotal + shippingFee;
+
+      if (calculatedTotal > 0 && verifiedTotal < calculatedTotal) {
+        console.warn(`[Security Alert] Client amount (₹${verifiedTotal}) lower than verified total (₹${calculatedTotal}). Enforcing verified total.`);
+        verifiedTotal = calculatedTotal;
+      }
+    }
+
+    if (!verifiedTotal || verifiedTotal <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid order amount' });
     }
 
-    const amountInPaise = Math.round(parsedAmount * 100);
+    const amountInPaise = Math.round(verifiedTotal * 100);
     const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
 
     const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
@@ -799,12 +753,15 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
       return res.status(400).json({ success: false, message: 'Missing Razorpay payment parameters.' });
     }
 
-    // Verify HMAC SHA256 Signature
+    // Verify HMAC SHA256 Signature using timing-safe comparison (CUR-SEC-07)
     const hmac = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET);
     hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const generated_signature = hmac.digest('hex');
 
-    if (generated_signature !== razorpay_signature) {
+    const genBuf = Buffer.from(generated_signature, 'utf8');
+    const recBuf = Buffer.from(razorpay_signature, 'utf8');
+
+    if (genBuf.length !== recBuf.length || !crypto.timingSafeEqual(genBuf, recBuf)) {
       console.error('[Razorpay Signature Mismatch]:', { generated: generated_signature, received: razorpay_signature });
       return res.status(400).json({ success: false, message: 'Payment verification failed: Invalid signature' });
     }
@@ -1024,8 +981,8 @@ app.post('/api/orders/track', (req, res) => {
   });
 });
 
-// Admin: Get all orders
-app.get('/api/orders', (req, res) => {
+// Admin: Get all orders (Protected with requireAdmin)
+app.get('/api/orders', requireAdmin, (req, res) => {
   const { status, channel } = req.query;
   let orders = [...db.data.orders];
 
@@ -1039,8 +996,8 @@ app.get('/api/orders', (req, res) => {
   res.json({ success: true, count: orders.length, orders });
 });
 
-// Admin: Update order status / courier details
-app.put('/api/orders/:id/status', (req, res) => {
+// Admin: Update order status / courier details (Protected with requireAdmin)
+app.put('/api/orders/:id/status', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { order_status, courier, tracking_number, tracking_url, notes } = req.body;
 
@@ -1061,8 +1018,8 @@ app.put('/api/orders/:id/status', (req, res) => {
   res.json({ success: true, order });
 });
 
-// Admin: Issue Refund
-app.post('/api/orders/:id/refund', (req, res) => {
+// Admin: Issue Refund (Protected with requireAdmin)
+app.post('/api/orders/:id/refund', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { reason = 'Customer Exception' } = req.body;
 

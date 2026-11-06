@@ -48,45 +48,10 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { success: false, message: 'Method not allowed. Use POST.' });
   }
 
-  try {
-    const { id } = req.query || {};
-    const body = await getRequestBody(req);
-    const { gateway_payment_id, payment_mode } = body || {};
-
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq';
-
-    if (id && supabaseUrl && supabaseKey) {
-      try {
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        await supabase
-          .from('orders')
-          .update({
-            payment_status: 'PAID',
-            status: 'CONFIRMED'
-          })
-          .or(`order_number.eq.${id},id.eq.${id}`);
-      } catch (err) {
-        console.warn('[Confirm Payment Supabase Warning]:', err.message);
-      }
-    }
-
-    return sendJson(res, 200, {
-      success: true,
-      message: 'Payment confirmed successfully',
-      order: {
-        id: id || `ord-${Date.now()}`,
-        payment_status: 'PAID',
-        order_status: 'CONFIRMED',
-        gateway_payment_id: gateway_payment_id || `pay_${Date.now()}`,
-        payment_mode: payment_mode || 'UPI'
-      }
-    });
-  } catch (err) {
-    console.error('[Confirm Payment Error]:', err);
-    return sendJson(res, 500, {
-      success: false,
-      message: err.message || 'Internal server error confirming payment.'
-    });
-  }
+  // CUR-SEC-02: Direct unauthenticated payment confirmation is deprecated & disabled.
+  // All order payment confirmations must pass through HMAC-verified /api/razorpay/verify-payment.
+  return sendJson(res, 410, {
+    success: false,
+    message: 'This endpoint is deprecated. Payments must be verified via cryptographic Razorpay gateway signature.'
+  });
 }

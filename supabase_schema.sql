@@ -193,22 +193,28 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 -- Drop existing orders policies to prevent conflicts
 DROP POLICY IF EXISTS "Public Read Access on Orders" ON public.orders;
 DROP POLICY IF EXISTS "Public Insert Orders" ON public.orders;
+DROP POLICY IF EXISTS "Admin Read All Orders" ON public.orders;
+DROP POLICY IF EXISTS "Customer Read Own Orders" ON public.orders;
 DROP POLICY IF EXISTS "Admin Update Orders" ON public.orders;
 DROP POLICY IF EXISTS "Admin Delete Orders" ON public.orders;
 
--- Public Insert: Customers can create orders upon checkout
-CREATE POLICY "Public Insert Orders"
-ON public.orders
-FOR INSERT
-TO public
-WITH CHECK (true);
-
--- Public Read: View orders for tracking and admin dashboard
-CREATE POLICY "Public Read Access on Orders"
+-- 1. Admin Read: hello.curatedindia@gmail.com can view all orders
+CREATE POLICY "Admin Read All Orders"
 ON public.orders
 FOR SELECT
-TO public
-USING (true);
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- 2. Customer Read: Authenticated customers can view ONLY their own orders
+CREATE POLICY "Customer Read Own Orders"
+ON public.orders
+FOR SELECT
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = LOWER(customer_email)
+);
 
 -- Admin Update: Strictly restricted so ONLY hello.curatedindia@gmail.com can update status (e.g. PACKED)
 CREATE POLICY "Admin Update Orders"

@@ -171,6 +171,13 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
           amount: payableAmount,
           currency: 'INR',
           receipt: orderRef,
+          items: cartItems.map(it => ({
+            product_id: it.product_id,
+            variant_id: it.variant_id,
+            sku: it.sku,
+            unit_price: it.unit_price || it.selling_price || it.price,
+            quantity: it.quantity || 1
+          })),
           notes: {
             order_number: orderRef,
             customer_name: shippingDetails.name,

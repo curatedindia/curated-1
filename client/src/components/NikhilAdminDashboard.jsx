@@ -548,9 +548,15 @@ export default function NikhilAdminDashboard({ onExit }) {
     const adminEmail = currentUser?.email || REQUIRED_ADMIN_EMAIL;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/broadcast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           adminEmail,
           subject: broadcastSubject.trim(),

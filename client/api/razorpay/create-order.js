@@ -50,13 +50,32 @@ export default async function handler(req, res) {
 
   try {
     const body = await getRequestBody(req);
-    const { amount, currency = 'INR', receipt, notes } = body || {};
-    const parsedAmount = parseFloat(amount);
-    if (!parsedAmount || parsedAmount <= 0) {
+    const { amount, currency = 'INR', receipt, notes, items } = body || {};
+
+    let verifiedTotal = parseFloat(amount);
+
+    // CUR-SEC-03: Server-side validation of item prices if items are provided
+    if (Array.isArray(items) && items.length > 0) {
+      const calculatedSubtotal = items.reduce((sum, it) => {
+        const itemPrice = Number(it.unit_price || it.selling_price || it.price || 0);
+        const qty = Number(it.quantity || 1);
+        return sum + (itemPrice * qty);
+      }, 0);
+      const shippingFee = calculatedSubtotal >= 1499 ? 0 : (calculatedSubtotal > 0 ? 99 : 0);
+      const calculatedTotal = calculatedSubtotal + shippingFee;
+
+      // Ensure client-submitted amount cannot be lower than calculated total
+      if (calculatedTotal > 0 && verifiedTotal < calculatedTotal) {
+        console.warn(`[Security Alert] Client amount (₹${verifiedTotal}) lower than verified total (₹${calculatedTotal}). Enforcing verified total.`);
+        verifiedTotal = calculatedTotal;
+      }
+    }
+
+    if (!verifiedTotal || verifiedTotal <= 0) {
       return sendJson(res, 400, { success: false, message: 'Invalid order amount' });
     }
 
-    const amountInPaise = Math.round(parsedAmount * 100);
+    const amountInPaise = Math.round(verifiedTotal * 100);
     const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
 
     const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {

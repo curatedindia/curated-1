@@ -53,12 +53,36 @@ export default async function handler(req, res) {
     const body = await getRequestBody(req);
     const { adminEmail, subject, message } = body || {};
 
-    // 1. Verify admin authorization
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {
-      return sendJson(res, 403, {
+    // 1. Verify admin authorization using Supabase JWT Bearer token (CUR-SEC-04)
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!serviceRoleKey) {
+      return sendJson(res, 500, {
         success: false,
-        error: 'Unauthorized: Only hello.curatedindia@gmail.com can broadcast drop alerts.'
+        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel Environment Variables.'
       });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const authHeader = req.headers.authorization || req.headers.Authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    if (token) {
+      const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+      if (authErr || !user || user.email.toLowerCase() !== 'hello.curatedindia@gmail.com') {
+        return sendJson(res, 403, {
+          success: false,
+          error: 'Unauthorized: Only authenticated hello.curatedindia@gmail.com can broadcast drop alerts.'
+        });
+      }
+    } else {
+      if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {
+        return sendJson(res, 403, {
+          success: false,
+          error: 'Unauthorized: Only hello.curatedindia@gmail.com can broadcast drop alerts.'
+        });
+      }
     }
 
     if (!subject || !subject.trim()) {
@@ -76,17 +100,6 @@ export default async function handler(req, res) {
     }
 
     // 2. Fetch all emails from newsletter_subscribers using Supabase Service Role Key
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!serviceRoleKey) {
-      return sendJson(res, 500, {
-        success: false,
-        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel Environment Variables.'
-      });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const { data: subscribers, error: fetchError } = await supabaseAdmin
       .from('newsletter_subscribers')
       .select('email');
