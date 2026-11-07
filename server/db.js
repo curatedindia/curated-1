@@ -364,16 +364,10 @@ function getInitialData() {
       subcategories: ['Casual', 'Printed', 'Oversized', 'Fashion']
     },
     {
-      id: 'jackets',
-      name: 'Jackets',
-      slug: 'jackets',
-      subcategories: ['Casual', 'Lightweight', 'Statement']
-    },
-    {
-      id: 'hoodies',
-      name: 'Hoodies',
-      slug: 'hoodies',
-      subcategories: ['Hoodies', 'Oversized', 'Graphic']
+      id: 'shoes',
+      name: 'Shoes',
+      slug: 'shoes',
+      subcategories: ['Sneakers', 'Loafers', 'Boots']
     }
   ];
 

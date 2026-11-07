@@ -490,23 +490,13 @@
       ]
     },
     {
-      "id": "jackets",
-      "name": "Jackets",
-      "slug": "jackets",
+      "id": "shoes",
+      "name": "Shoes",
+      "slug": "shoes",
       "subcategories": [
-        "Casual",
-        "Lightweight",
-        "Statement"
-      ]
-    },
-    {
-      "id": "hoodies",
-      "name": "Hoodies",
-      "slug": "hoodies",
-      "subcategories": [
-        "Hoodies",
-        "Oversized",
-        "Graphic"
+        "Sneakers",
+        "Loafers",
+        "Boots"
       ]
     }
   ],

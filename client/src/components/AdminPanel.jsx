@@ -774,8 +774,7 @@ export default function AdminPanel({ onExitAdmin }) {
                   >
                     <option value="t-shirts">T-Shirts</option>
                     <option value="shirts">Shirts</option>
-                    <option value="jackets">Jackets</option>
-                    <option value="hoodies">Hoodies</option>
+                    <option value="shoes">Shoes</option>
                   </select>
                 </div>
                 <div>

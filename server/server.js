@@ -105,6 +105,7 @@ if (holdCleanupTimer && holdCleanupTimer.unref) {
 function generateSKU(categoryId) {
   let prefix = 'TS';
   if (categoryId === 'shirts') prefix = 'SH';
+  else if (categoryId === 'shoes') prefix = 'SO';
   else if (categoryId === 'jackets') prefix = 'JK';
   else if (categoryId === 'hoodies') prefix = 'HD';
 

@@ -618,8 +618,7 @@ export default function App() {
                       { id: 'all', label: 'ALL PIECES' },
                       { id: 't-shirts', label: 'T-SHIRTS' },
                       { id: 'shirts', label: 'SHIRTS' },
-                      { id: 'jackets', label: 'JACKETS' },
-                      { id: 'hoodies', label: 'HOODIES' }
+                      { id: 'shoes', label: 'SHOES' }
                     ].map((tab) => (
                       <button
                         key={tab.id}
@@ -736,18 +735,11 @@ export default function App() {
                       count: countForCategory('shirts')
                     },
                     {
-                      id: 'jackets',
-                      name: 'JACKETS',
-                      sub: 'Chore, Bombers & Workwear',
-                      img: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&q=80',
-                      count: countForCategory('jackets')
-                    },
-                    {
-                      id: 'hoodies',
-                      name: 'HOODIES',
-                      sub: 'French Terry & Drop-Shoulder',
-                      img: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=600&q=80',
-                      count: countForCategory('hoodies')
+                      id: 'shoes',
+                      name: 'SHOES',
+                      sub: 'Sneakers, Loafers & Boots',
+                      img: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=80',
+                      count: countForCategory('shoes')
                     }
                   ].map((cat) => (
                     <div
@@ -888,7 +880,7 @@ export default function App() {
 
               {/* Faceted Filter Pills */}
               <div className="mobile-scroll-row" style={{ alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
-                {['', 't-shirts', 'shirts', 'jackets', 'hoodies'].map((cat) => (
+                {['', 't-shirts', 'shirts', 'shoes'].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setCategoryFilter(cat)}

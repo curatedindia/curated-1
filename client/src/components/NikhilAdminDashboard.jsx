@@ -1241,8 +1241,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                     >
                       <option value="t-shirts">T-Shirts</option>
                       <option value="shirts">Shirts</option>
-                      <option value="hoodies">Hoodies</option>
-                      <option value="jackets">Jackets</option>
+                      <option value="shoes">Shoes</option>
                       <option value="pants">Pants</option>
                       <option value="accessories">Accessories</option>
                     </select>
