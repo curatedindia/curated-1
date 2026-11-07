@@ -171,11 +171,16 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
           amount: payableAmount,
           currency: 'INR',
           receipt: orderRef,
+          subtotal: subtotal,
+          shipping: shippingFee,
+          delivery_charge: shippingFee,
           items: cartItems.map(it => ({
             product_id: it.product_id,
             variant_id: it.variant_id,
             sku: it.sku,
             unit_price: it.unit_price || it.selling_price || it.price,
+            delivery_charge: it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge !== undefined ? it.deliveryCharge : 0),
+            deliveryCharge: it.deliveryCharge !== undefined ? it.deliveryCharge : (it.delivery_charge !== undefined ? it.delivery_charge : 0),
             quantity: it.quantity || 1
           })),
           notes: {

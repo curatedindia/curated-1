@@ -50,24 +50,54 @@ export default async function handler(req, res) {
 
   try {
     const body = await getRequestBody(req);
-    const { amount, currency = 'INR', receipt, notes, items } = body || {};
+    const { amount, currency = 'INR', receipt, notes, items, shipping, delivery_charge, subtotal } = body || {};
 
-    let verifiedTotal = parseFloat(amount);
+    let clientAmount = parseFloat(amount);
+    let verifiedTotal = clientAmount;
 
-    // CUR-SEC-03: Server-side validation of item prices if items are provided
+    // Server-side validation of item prices and custom delivery charges
     if (Array.isArray(items) && items.length > 0) {
       const calculatedSubtotal = items.reduce((sum, it) => {
         const itemPrice = Number(it.unit_price || it.selling_price || it.price || 0);
         const qty = Number(it.quantity || 1);
         return sum + (itemPrice * qty);
       }, 0);
-      const shippingFee = calculatedSubtotal >= 1499 ? 0 : (calculatedSubtotal > 0 ? 99 : 0);
-      const calculatedTotal = calculatedSubtotal + shippingFee;
 
-      // Ensure client-submitted amount cannot be lower than calculated total
-      if (calculatedTotal > 0 && verifiedTotal < calculatedTotal) {
-        console.warn(`[Security Alert] Client amount (₹${verifiedTotal}) lower than verified total (₹${calculatedTotal}). Enforcing verified total.`);
-        verifiedTotal = calculatedTotal;
+      // Check if custom delivery charge is specified per-item or in request
+      const hasItemDeliveryCharge = items.some((it) =>
+        (it.deliveryCharge !== undefined && it.deliveryCharge !== null && it.deliveryCharge !== '') ||
+        (it.delivery_charge !== undefined && it.delivery_charge !== null && it.delivery_charge !== '')
+      );
+
+      let calculatedShipping = 0;
+      if (hasItemDeliveryCharge) {
+        calculatedShipping = items.reduce((sum, it) => {
+          const ch = it.deliveryCharge !== undefined && it.deliveryCharge !== null && it.deliveryCharge !== ''
+            ? Number(it.deliveryCharge)
+            : (it.delivery_charge !== undefined && it.delivery_charge !== null && it.delivery_charge !== ''
+              ? Number(it.delivery_charge)
+              : 0);
+          return sum + (isNaN(ch) ? 0 : ch);
+        }, 0);
+      } else if (shipping !== undefined && shipping !== null && shipping !== '') {
+        calculatedShipping = Number(shipping) || 0;
+      } else if (delivery_charge !== undefined && delivery_charge !== null && delivery_charge !== '') {
+        calculatedShipping = Number(delivery_charge) || 0;
+      } else if (clientAmount > 0 && Math.abs(clientAmount - calculatedSubtotal) < 0.01) {
+        calculatedShipping = 0;
+      }
+
+      const expectedTotal = calculatedSubtotal + calculatedShipping;
+
+      // Price protection: prevent paying less than item subtotal
+      if (calculatedSubtotal > 0 && clientAmount < calculatedSubtotal) {
+        console.warn(`[Security Alert] Client amount (₹${clientAmount}) lower than item subtotal (₹${calculatedSubtotal}). Enforcing expected total.`);
+        verifiedTotal = expectedTotal > 0 ? expectedTotal : calculatedSubtotal;
+      } else if (clientAmount > 0) {
+        // Respect the exact client amount (product price + any calculated delivery)
+        verifiedTotal = clientAmount;
+      } else if (expectedTotal > 0) {
+        verifiedTotal = expectedTotal;
       }
     }
 
