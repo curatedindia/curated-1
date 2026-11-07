@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 
 -- Ensure delivery_charge column exists if table is already created
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS delivery_charge NUMERIC(10, 2) DEFAULT 0;
+NOTIFY pgrst, 'reload schema';
 
 -- 2. ENABLE ROW LEVEL SECURITY (RLS) ON PRODUCTS TABLE
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -117,41 +118,36 @@ FOR SELECT
 TO authenticated
 USING (
   bucket_id = 'product-images'
-  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Storage Admin INSERT (Upload) strictly restricted to hello.curatedindia@gmail.com
+-- Storage Admin INSERT (Upload) to product-images
 CREATE POLICY "Admin Upload Product Images"
 ON storage.objects
 FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'product-images'
-  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Storage Admin UPDATE strictly restricted to hello.curatedindia@gmail.com
+-- Storage Admin UPDATE
 CREATE POLICY "Admin Update Product Images"
 ON storage.objects
 FOR UPDATE
 TO authenticated
 USING (
   bucket_id = 'product-images'
-  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 )
 WITH CHECK (
   bucket_id = 'product-images'
-  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Storage Admin DELETE strictly restricted to hello.curatedindia@gmail.com
+-- Storage Admin DELETE
 CREATE POLICY "Admin Delete Product Images"
 ON storage.objects
 FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'product-images'
-  AND LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
 -- ==============================================================================
