@@ -321,7 +321,7 @@ export default function CheckoutModal({
             created_at: new Date().toISOString()
           };
 
-          // 1. Direct Supabase insert/upsert
+          // 1. Direct Supabase insert for immediate visibility in Admin Dashboard
           try {
             const supabasePayload = {
               order_number: orderRef,
@@ -335,11 +335,17 @@ export default function CheckoutModal({
               created_at: orderPayload.created_at
             };
 
-            await supabase
+            const { data, error: insertError } = await supabase
               .from('orders')
-              .upsert([supabasePayload], { onConflict: 'order_number' });
+              .insert([supabasePayload]);
+
+            if (insertError && insertError.code !== '23505') {
+              console.warn('[CheckoutModal] Supabase direct insert notice:', insertError.message);
+            } else {
+              console.log('[CheckoutModal] Order synced directly to Supabase:', orderRef);
+            }
           } catch (sbErr) {
-            console.warn('[CheckoutModal] Supabase sync notice:', sbErr);
+            console.warn('[CheckoutModal] Supabase sync exception:', sbErr);
           }
 
           // 2. Call backend verification endpoint

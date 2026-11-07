@@ -87,8 +87,8 @@ export default async function handler(req, res) {
     if (supabaseUrl && supabaseKey) {
       try {
         const supabase = createClient(supabaseUrl, supabaseKey);
-        const { error: insErr } = await supabase.from('orders').upsert([orderRecord], { onConflict: 'order_number' });
-        if (insErr) {
+        const { error: insErr } = await supabase.from('orders').insert([orderRecord]);
+        if (insErr && insErr.code !== '23505') {
           console.warn('[Create Order Supabase Insert Warning]:', insErr.message);
         }
       } catch (dbErr) {

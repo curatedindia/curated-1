@@ -189,48 +189,61 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 -- Drop existing orders policies to prevent conflicts
 DROP POLICY IF EXISTS "Public Read Access on Orders" ON public.orders;
 DROP POLICY IF EXISTS "Public Insert Orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow Insert Orders" ON public.orders;
 DROP POLICY IF EXISTS "Admin Read All Orders" ON public.orders;
 DROP POLICY IF EXISTS "Customer Read Own Orders" ON public.orders;
 DROP POLICY IF EXISTS "Admin Update Orders" ON public.orders;
 DROP POLICY IF EXISTS "Admin Delete Orders" ON public.orders;
 
--- 1. Admin Read: hello.curatedindia@gmail.com can view all orders
+-- 1. Allow Order Insertion: Any customer (guest or authenticated) can insert their order upon payment
+CREATE POLICY "Allow Insert Orders"
+ON public.orders
+FOR INSERT
+TO public
+WITH CHECK (true);
+
+-- 2. Admin Read: hello.curatedindia@gmail.com can view all orders
 CREATE POLICY "Admin Read All Orders"
 ON public.orders
 FOR SELECT
 TO authenticated
 USING (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- 2. Customer Read: Authenticated customers can view ONLY their own orders
+-- 3. Customer Read: Authenticated customers can view ONLY their own orders
 CREATE POLICY "Customer Read Own Orders"
 ON public.orders
 FOR SELECT
 TO authenticated
 USING (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = LOWER(customer_email)
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = LOWER(customer_email)
 );
 
--- Admin Update: Strictly restricted so ONLY hello.curatedindia@gmail.com can update status (e.g. PACKED)
+-- 4. Admin Update: Strictly restricted so ONLY hello.curatedindia@gmail.com can update status (e.g. PACKED)
 CREATE POLICY "Admin Update Orders"
 ON public.orders
 FOR UPDATE
 TO authenticated
 USING (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 )
 WITH CHECK (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
--- Admin Delete: Strictly restricted to hello.curatedindia@gmail.com
+-- 5. Admin Delete: Strictly restricted to hello.curatedindia@gmail.com
 CREATE POLICY "Admin Delete Orders"
 ON public.orders
 FOR DELETE
 TO authenticated
 USING (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
 
 -- ==============================================================================

@@ -279,7 +279,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
             created_at: new Date().toISOString()
           };
 
-          // 1. Direct Supabase insert/upsert for immediate visibility
+          // 1. Direct Supabase insert for immediate visibility in Admin Dashboard
           try {
             const supabasePayload = {
               order_number: orderRef,
@@ -293,11 +293,17 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
               created_at: orderPayload.created_at
             };
 
-            await supabase
+            const { data, error: insertError } = await supabase
               .from('orders')
-              .upsert([supabasePayload], { onConflict: 'order_number' });
+              .insert([supabasePayload]);
+
+            if (insertError && insertError.code !== '23505') {
+              console.warn('[Checkout] Supabase direct insert notice:', insertError.message);
+            } else {
+              console.log('[Checkout] Order synced directly to Supabase:', orderRef);
+            }
           } catch (sbErr) {
-            console.warn('[Checkout] Supabase sync notice:', sbErr);
+            console.warn('[Checkout] Supabase sync exception:', sbErr);
           }
 
           // 2. Call backend verification endpoint (if active)

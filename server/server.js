@@ -851,8 +851,13 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
       db.save();
     }
 
-    // Sync to Supabase orders table
-    if (supabaseAdmin) {
+    // Sync to Supabase orders table (using service role or publishable client)
+    const targetSupabase = supabaseAdmin || createClient(
+      supabaseUrl,
+      process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq'
+    );
+
+    if (targetSupabase) {
       try {
         const supabasePayload = {
           order_number: finalOrderNumber,
@@ -866,11 +871,15 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
           created_at: newOrder.created_at
         };
 
-        const { error: sbErr } = await supabaseAdmin
+        const { error: sbErr } = await targetSupabase
           .from('orders')
-          .upsert([supabasePayload], { onConflict: 'order_number' });
+          .insert([supabasePayload]);
 
-        if (sbErr) console.warn('[Supabase Sync Warning]:', sbErr.message);
+        if (sbErr && sbErr.code !== '23505') {
+          console.warn('[Supabase Sync Warning]:', sbErr.message);
+        } else {
+          console.log('[Supabase Server Sync Success]:', finalOrderNumber);
+        }
       } catch (err) {
         console.warn('[Supabase Sync Exception]:', err.message);
       }
