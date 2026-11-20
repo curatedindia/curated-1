@@ -68,22 +68,21 @@ module.exports = async function handler(req, res) {
     const authHeader = req.headers.authorization || req.headers.Authorization || '';
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-    if (token) {
-      const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-      if (authErr || !user || user.email.toLowerCase() !== 'hello.curatedindia@gmail.com') {
-        return sendJson(res, 403, {
-          success: false,
-          error: 'Unauthorized: Only authenticated hello.curatedindia@gmail.com can broadcast drop alerts.'
-        });
-      }
-    } else {
-      // Fallback check requires explicit admin email verification
-      if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {
-        return sendJson(res, 403, {
-          success: false,
-          error: 'Unauthorized: Only hello.curatedindia@gmail.com can broadcast drop alerts.'
-        });
-      }
+    if (!token) {
+      return sendJson(res, 401, {
+        success: false,
+        error: 'Unauthorized: Authentication token is required.'
+      });
+    }
+
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+    const targetAdminEmail = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com').toLowerCase().trim();
+
+    if (authErr || !user || !user.email || user.email.toLowerCase().trim() !== targetAdminEmail) {
+      return sendJson(res, 403, {
+        success: false,
+        error: 'Forbidden: Admin access required.'
+      });
     }
 
     if (!subject || !subject.trim()) {

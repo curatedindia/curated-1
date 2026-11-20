@@ -72,21 +72,24 @@ const requireAdmin = async (req, res, next) => {
     const authHeader = req.headers.authorization || req.headers.Authorization || '';
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-    if (token && supabaseAdmin) {
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !user || user.email.toLowerCase() !== 'hello.curatedindia@gmail.com') {
-        return res.status(403).json({ success: false, message: 'Forbidden: Admin credentials required.' });
-      }
-      req.adminUser = user;
-      return next();
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Admin authentication required.' });
     }
 
-    // Allow in local development if no supabaseAdmin configured
-    if (!supabaseAdmin) {
-      return next();
+    const clientForAuth = supabaseAdmin || createClient(
+      supabaseUrl,
+      process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq'
+    );
+
+    const { data: { user }, error } = await clientForAuth.auth.getUser(token);
+    const targetAdminEmail = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com').toLowerCase().trim();
+
+    if (error || !user || !user.email || user.email.toLowerCase().trim() !== targetAdminEmail) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Admin credentials required.' });
     }
 
-    return res.status(401).json({ success: false, message: 'Admin authentication required.' });
+    req.adminUser = user;
+    return next();
   } catch (err) {
     console.error('[Admin Auth Error]:', err);
     return res.status(500).json({ success: false, message: 'Authentication verification failure.' });
@@ -1722,19 +1725,11 @@ app.post('/api/test/parallel-purchase', async (req, res) => {
 
 // ========================================================
 // EMAIL BROADCAST ROUTE (/api/broadcast)
-// Authorized exclusively for hello.curatedindia@gmail.com
+// Authorized exclusively for admin via requireAdmin
 // ========================================================
-app.post(['/api/broadcast', '/broadcast'], async (req, res) => {
+app.post(['/api/broadcast', '/broadcast'], requireAdmin, async (req, res) => {
   try {
-    const { adminEmail, subject, message } = req.body || {};
-
-    // 1. Verify admin authorization
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== 'hello.curatedindia@gmail.com') {
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized: Only hello.curatedindia@gmail.com can broadcast drop alerts.'
-      });
-    }
+    const { subject, message } = req.body || {};
 
     if (!subject || !subject.trim()) {
       return res.status(400).json({
