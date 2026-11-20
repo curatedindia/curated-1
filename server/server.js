@@ -804,7 +804,7 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
 
     console.log(`[RAZORPAY VERIFIED] Payment ID: ${razorpay_payment_id} | Order ID: ${razorpay_order_id}`);
 
-    const finalOrderNumber = order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalOrderNumber = order_number || `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
     const finalTotal = Number(total_amount || total || 0);
 
     const newOrder = {
@@ -920,7 +920,7 @@ app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
       shipping_address
     } = req.body || {};
 
-    const finalOrderNumber = order_number || `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalOrderNumber = order_number || `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
     const finalTotal = Number(total_amount || total || 0);
     const finalPaymentStatus = payment_status || 'PAID';
 

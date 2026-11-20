@@ -387,7 +387,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
       console.warn('Unable to persist shipping details in localStorage:', err);
     }
 
-    const orderNumber = `CUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderNumber = `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
     const orderId = `ord-${Date.now()}`;
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
