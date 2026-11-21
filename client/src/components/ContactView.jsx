@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
+import { Mail, Send, CheckCircle2 } from 'lucide-react';
 
 const InstagramIcon = ({ size = 20, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,26 +113,6 @@ export default function ContactView({ settings }) {
                 hello.curatedindia@gmail.com
               </a>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Response within 24 business hours</div>
-            </div>
-          </div>
-
-          {/* Operating Hours */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            padding: '20px',
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)'
-          }}>
-            <div style={{ padding: '10px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)' }}>
-              <Clock size={24} color="var(--text-secondary)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700 }}>SUPPORT HOURS</div>
-              <div style={{ fontSize: '14px', fontWeight: 600 }}>Mon – Sat: 10:00 AM – 8:00 PM IST</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Mumbai Standard Time (IST)</div>
             </div>
           </div>
         </div>
