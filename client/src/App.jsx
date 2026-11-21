@@ -14,7 +14,6 @@ import AboutView from './components/AboutView';
 import ContactView from './components/ContactView';
 import PolicyModal from './components/PolicyModal';
 import OrdersView from './components/OrdersView';
-import AdminPanel from './components/AdminPanel';
 import NikhilAdminDashboard from './components/NikhilAdminDashboard';
 import StayTunedSection from './components/StayTunedSection';
 import {
@@ -76,7 +75,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('home'); // 'home' | 'shop' | 'new-drops' | 'sold-out' | 'track-order' | 'about' | 'contact' | 'admin' | 'policy-*'
+  const [currentView, setCurrentView] = useState('home'); // 'home' | 'shop' | 'new-drops' | 'sold-out' | 'track-order' | 'about' | 'contact' | 'nikhil' | 'policy-*'
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -292,8 +291,68 @@ export default function App() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
-        () => {
-          fetchProductsAndSettings();
+        (payload) => {
+          if (payload?.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new;
+            setProducts((prev) =>
+              prev.map((p) => {
+                if (p.id !== updated.id) return p;
+                const totalAvail = updated.total_available ?? (updated.status === 'SOLD_OUT' ? 0 : (p.total_available ?? 1));
+                const totalOnHand = updated.total_on_hand ?? (updated.status === 'SOLD_OUT' ? 0 : (p.total_on_hand ?? 1));
+                const status = updated.status || (totalAvail <= 0 ? 'SOLD_OUT' : p.status);
+                let imgs = updated.images;
+                if (!Array.isArray(imgs)) {
+                  if (updated.image_url) imgs = [updated.image_url];
+                  else if (typeof imgs === 'string') {
+                    try { imgs = JSON.parse(imgs); } catch { imgs = [imgs]; }
+                  } else {
+                    imgs = p.images || [];
+                  }
+                }
+                const variants = Array.isArray(updated.variants) && updated.variants.length > 0
+                  ? updated.variants
+                  : (p.variants || [{
+                      id: `var-${updated.id}`,
+                      product_id: updated.id,
+                      size: updated.size || p.size || 'One Size',
+                      on_hand: totalOnHand,
+                      available: totalAvail,
+                      stock_on_hand: totalOnHand,
+                      reserved: 0
+                    }]);
+
+                return {
+                  ...p,
+                  ...updated,
+                  status,
+                  name: updated.title || updated.name || p.name,
+                  title: updated.title || updated.name || p.title,
+                  total_available: totalAvail,
+                  total_on_hand: totalOnHand,
+                  variants,
+                  images: imgs.length ? imgs : p.images,
+                  image_url: (imgs && imgs[0]) || updated.image_url || p.image_url
+                };
+              })
+            );
+
+            // Immediately update selected product details modal if open
+            setSelectedProduct((prev) => {
+              if (!prev || prev.id !== updated.id) return prev;
+              const totalAvail = updated.total_available ?? (updated.status === 'SOLD_OUT' ? 0 : (prev.total_available ?? 1));
+              const totalOnHand = updated.total_on_hand ?? (updated.status === 'SOLD_OUT' ? 0 : (prev.total_on_hand ?? 1));
+              const status = updated.status || (totalAvail <= 0 ? 'SOLD_OUT' : prev.status);
+              return {
+                ...prev,
+                ...updated,
+                status,
+                total_available: totalAvail,
+                total_on_hand: totalOnHand
+              };
+            });
+          } else {
+            fetchProductsAndSettings();
+          }
         }
       )
       .subscribe();
@@ -405,7 +464,7 @@ export default function App() {
 
   // Filtered views
   const availableShopProducts = products.filter((p) => {
-    const isAvail = p.status !== 'SOLD_OUT' && (p.total_available === undefined || p.total_available === null || p.total_available > 0);
+    const isAvail = p.status !== 'SOLD_OUT' && p.status !== 'SOLD' && (p.total_available === undefined || p.total_available === null || p.total_available > 0);
     if (!isAvail) return false;
     if (categoryFilter && p.category_id?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
     if (conditionFilter && p.condition?.toLowerCase() !== conditionFilter.toLowerCase()) return false;
@@ -429,7 +488,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
       {/* Universal Navigation */}
-      {currentView !== 'admin' && currentView !== 'nikhil' && (
+      {currentView !== 'nikhil' && (
         <Navbar
           currentView={currentView}
           setCurrentView={setCurrentView}
@@ -437,8 +496,6 @@ export default function App() {
           onOpenCart={() => setCartDrawerOpen(true)}
           onOpenSearch={() => setSearchModalOpen(true)}
           soldOutEnabled={settings?.sold_out_section_enabled}
-          isAdmin={false}
-          setIsAdmin={() => setCurrentView('admin')}
           user={authUser}
           onNavigateToOrders={() => {
             setCurrentView('orders');
@@ -462,13 +519,6 @@ export default function App() {
               fetchProductsAndSettings();
             }}
           />
-        )}
-
-        {/* ========================================================
-            VIEW: ADMIN CONTROL CENTER
-        ======================================================== */}
-        {currentView === 'admin' && (
-          <AdminPanel onExitAdmin={() => { setCurrentView('home'); fetchProductsAndSettings(); }} />
         )}
 
         {/* ========================================================
@@ -1105,6 +1155,7 @@ export default function App() {
         onProceedToCheckout={handleOpenCheckout}
         settings={settings}
         user={authUser}
+        products={products}
       />
 
       <CheckoutModal
@@ -1133,7 +1184,7 @@ export default function App() {
       )}
 
       {/* Global Footer */}
-      {currentView !== 'admin' && currentView !== 'nikhil' && (
+      {currentView !== 'nikhil' && (
         <Footer
           setCurrentView={setCurrentView}
           setCategoryFilter={setCategoryFilter}

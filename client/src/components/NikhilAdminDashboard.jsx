@@ -21,7 +21,10 @@ import {
   ShieldCheck,
   Lock,
   ChevronRight,
-  Download
+  Download,
+  Edit2,
+  Plus,
+  Minus
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
@@ -70,10 +73,25 @@ export default function NikhilAdminDashboard({ onExit }) {
     sellingPrice: '',
     originalPrice: '',
     deliveryCharge: 0,
+    quantity: 1,
     chest: '',
     length: '',
     shoulder: '',
     sleeve: '',
+    conditionNotes: ''
+  });
+
+  // Product Edit & Stock Management State
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [updatingProductId, setUpdatingProductId] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    sellingPrice: '',
+    originalPrice: '',
+    quantity: 1,
+    status: 'ACTIVE',
+    condition: 'New / Unused',
     conditionNotes: ''
   });
 
@@ -506,6 +524,8 @@ export default function NikhilAdminDashboard({ onExit }) {
       const generatedSku = `CUR-${categoryCode}-${Math.floor(100 + Math.random() * 900)}`;
       const generatedSlug = productForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const parsedDelivery = parseFloat(productForm.deliveryCharge) || 0;
+      const rawQty = parseInt(productForm.quantity, 10);
+      const parsedQuantity = isNaN(rawQty) || rawQty < 1 ? 1 : rawQty;
 
       const newProductPayload = {
         sku: generatedSku,
@@ -529,8 +549,8 @@ export default function NikhilAdminDashboard({ onExit }) {
         images: [publicUrl],
         status: 'ACTIVE',
         is_new_drop: true,
-        total_on_hand: 1,
-        total_available: 1,
+        total_on_hand: parsedQuantity,
+        total_available: parsedQuantity,
         pieces_sold: 0,
         created_at: new Date().toISOString()
       };
@@ -569,6 +589,7 @@ export default function NikhilAdminDashboard({ onExit }) {
         sellingPrice: '',
         originalPrice: '',
         deliveryCharge: 0,
+        quantity: 1,
         chest: '',
         length: '',
         shoulder: '',
@@ -612,6 +633,120 @@ export default function NikhilAdminDashboard({ onExit }) {
     } catch (err) {
       console.error('Delete error:', err);
       setActionError(err.message || 'Failed to delete product from Supabase.');
+    }
+  };
+
+  const handleQuickStockChange = async (product, delta) => {
+    const currentQty = product.total_available !== undefined && product.total_available !== null
+      ? product.total_available
+      : (product.total_on_hand !== undefined && product.total_on_hand !== null ? product.total_on_hand : 1);
+    const newQty = Math.max(0, currentQty + delta);
+    if (newQty === currentQty) return;
+
+    const newStatus = newQty === 0 ? 'SOLD' : (product.status === 'SOLD' || product.status === 'SOLD_OUT' ? 'ACTIVE' : product.status || 'ACTIVE');
+
+    // Optimistic UI update
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id
+          ? { ...p, total_available: newQty, total_on_hand: newQty, status: newStatus }
+          : p
+      )
+    );
+
+    setUpdatingProductId(product.id);
+    try {
+      const { error: dbError } = await supabase
+        .from('products')
+        .update({
+          total_available: newQty,
+          total_on_hand: newQty,
+          status: newStatus
+        })
+        .eq('id', product.id);
+
+      if (dbError) throw dbError;
+
+      setSuccessMessage(`✓ Stock updated for "${product.name}": ${newQty} available.`);
+      setTimeout(() => setSuccessMessage(''), 2500);
+    } catch (err) {
+      console.error('Failed to update stock in Supabase:', err);
+      setActionError(`Failed to update stock: ${err.message}`);
+      // Revert on error
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id
+            ? { ...p, total_available: currentQty, total_on_hand: currentQty, status: product.status }
+            : p
+        )
+      );
+      setTimeout(() => setActionError(''), 4000);
+    } finally {
+      setUpdatingProductId(null);
+    }
+  };
+
+  const openEditModal = (product) => {
+    const stockQty = product.total_available !== undefined && product.total_available !== null
+      ? product.total_available
+      : (product.total_on_hand !== undefined && product.total_on_hand !== null ? product.total_on_hand : 1);
+
+    setEditForm({
+      name: product.name || '',
+      sellingPrice: product.selling_price || '',
+      originalPrice: product.original_price || '',
+      quantity: stockQty,
+      status: product.status || 'ACTIVE',
+      condition: product.condition || 'New / Unused',
+      conditionNotes: product.condition_notes || ''
+    });
+    setEditingProduct(product);
+  };
+
+  const handleSaveProductEdit = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const parsedQty = Math.max(0, parseInt(editForm.quantity, 10) || 0);
+    const newStatus = parsedQty === 0 && editForm.status === 'ACTIVE' ? 'SOLD' : editForm.status;
+
+    setSavingEdit(true);
+    setActionError('');
+
+    try {
+      const updates = {
+        name: editForm.name.trim() || editingProduct.name,
+        selling_price: parseFloat(editForm.sellingPrice) || editingProduct.selling_price,
+        original_price: editForm.originalPrice ? parseFloat(editForm.originalPrice) : null,
+        total_available: parsedQty,
+        total_on_hand: parsedQty,
+        status: newStatus,
+        condition: editForm.condition,
+        condition_notes: editForm.conditionNotes.trim()
+      };
+
+      const { error: dbError } = await supabase
+        .from('products')
+        .update(updates)
+        .eq('id', editingProduct.id);
+
+      if (dbError) throw dbError;
+
+      // Update local state
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editingProduct.id ? { ...p, ...updates } : p
+        )
+      );
+
+      setSuccessMessage(`✓ Updated "${updates.name}" (${parsedQty} in stock, status: ${newStatus})`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error('Failed to update product:', err);
+      setActionError(err.message || 'Failed to update product in Supabase.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1300,20 +1435,37 @@ export default function NikhilAdminDashboard({ onExit }) {
                   </div>
                 </div>
 
-                {/* Delivery Charge */}
-                <div>
-                  <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase tracking-wider">
-                    DELIVERY CHARGE (₹)
-                  </label>
-                  <input
-                    type="number"
-                    name="deliveryCharge"
-                    min="0"
-                    value={productForm.deliveryCharge}
-                    onChange={handleProductFormChange}
-                    placeholder="0"
-                    className="w-full h-11 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none shadow-xs transition-colors"
-                  />
+                {/* Delivery Charge & Stock Quantity */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-zinc-500 block mb-1 uppercase tracking-wider">
+                      DELIVERY CHARGE (₹)
+                    </label>
+                    <input
+                      type="number"
+                      name="deliveryCharge"
+                      min="0"
+                      value={productForm.deliveryCharge}
+                      onChange={handleProductFormChange}
+                      placeholder="0"
+                      className="w-full h-11 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none shadow-xs transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                      PIECES IN STOCK / QUANTITY *
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      min="1"
+                      value={productForm.quantity}
+                      onChange={handleProductFormChange}
+                      placeholder="1"
+                      className="w-full h-11 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none shadow-xs transition-colors font-medium"
+                    />
+                  </div>
                 </div>
 
                 {/* Measurements Grid (2x2) */}
@@ -1442,50 +1594,134 @@ export default function NikhilAdminDashboard({ onExit }) {
                   No products in catalog yet.
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-3">
                   {products.map((item) => {
                     const img = Array.isArray(item.images)
                       ? (item.images[0] || item.image_url)
                       : (item.images || item.image_url || '');
 
+                    const stockQty = item.total_available !== undefined && item.total_available !== null
+                      ? item.total_available
+                      : (item.total_on_hand !== undefined && item.total_on_hand !== null ? item.total_on_hand : 1);
+                    const isSoldOut = stockQty <= 0 || (item.status || '').toUpperCase() === 'SOLD' || (item.status || '').toUpperCase() === 'SOLD_OUT';
+                    const displayStatus = isSoldOut ? 'SOLD OUT' : (item.status || 'ACTIVE');
+
                     return (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between p-2.5 border border-zinc-200 rounded-xl bg-white gap-3 hover:border-zinc-300 transition-colors"
+                        className="p-3 border border-zinc-200 rounded-xl bg-white flex flex-col gap-2.5 shadow-2xs hover:border-zinc-300 transition-colors"
                       >
-                        {img ? (
-                          <img
-                            src={img}
-                            alt={item.name}
-                            className="w-[52px] h-[64px] object-cover rounded-lg bg-zinc-100 shrink-0 border border-zinc-200 shadow-2xs"
-                          />
-                        ) : (
-                          <div className="w-[52px] h-[64px] rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 border border-zinc-200">
-                            <Package size={18} />
-                          </div>
-                        )}
+                        {/* Top: Image + Info */}
+                        <div className="flex items-start gap-3">
+                          {img ? (
+                            <img
+                              src={img}
+                              alt={item.name}
+                              className="w-[52px] h-[64px] object-cover rounded-lg bg-zinc-100 shrink-0 border border-zinc-200 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-[52px] h-[64px] rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 border border-zinc-200">
+                              <Package size={18} />
+                            </div>
+                          )}
 
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">
-                            {item.sku || item.category_id}
-                          </span>
-                          <div className="text-xs font-bold text-zinc-900 truncate mt-0.5">
-                            {item.name}
-                          </div>
-                          <div className="text-xs font-black text-zinc-900 mt-0.5">
-                            ₹{(parseFloat(item.selling_price) || 0).toLocaleString('en-IN')}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase truncate">
+                                {item.sku || item.category_id}
+                              </span>
+                              <div className="text-xs font-black text-zinc-900 shrink-0">
+                                ₹{(parseFloat(item.selling_price) || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+
+                            <div className="text-xs font-bold text-zinc-900 truncate mt-0.5">
+                              {item.name}
+                            </div>
+
+                            {/* Status & Available Pieces Badges */}
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+                                isSoldOut
+                                  ? 'bg-zinc-100 text-zinc-500 border-zinc-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {displayStatus}
+                              </span>
+
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+                                stockQty > 0
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-red-50 text-red-600 border-red-200'
+                              }`}>
+                                {stockQty} {stockQty === 1 ? 'PIECE' : 'PIECES'} IN STOCK
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => handleDeleteProduct(item)}
-                          title="Delete piece"
-                          aria-label={`Delete ${item.name}`}
-                          className="w-10 h-10 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-xl flex items-center justify-center cursor-pointer transition-colors shrink-0"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {/* Bottom: Stock Management & Actions */}
+                        <div className="flex items-center justify-between pt-2 border-t border-zinc-100 gap-2">
+                          {/* Stock Stepper */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                              STOCK:
+                            </span>
+                            <div className="flex items-center bg-zinc-100 border border-zinc-200 rounded-lg p-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickStockChange(item, -1)}
+                                disabled={updatingProductId === item.id || stockQty <= 0}
+                                title="Decrease stock by 1"
+                                aria-label="Decrease stock"
+                                className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-white rounded transition-colors disabled:opacity-30 cursor-pointer"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="px-2 text-xs font-mono font-bold text-zinc-800 min-w-[28px] text-center">
+                                {updatingProductId === item.id ? (
+                                  <Loader2 size={11} className="animate-spin mx-auto text-zinc-600" />
+                                ) : (
+                                  stockQty
+                                )}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickStockChange(item, 1)}
+                                disabled={updatingProductId === item.id}
+                                title="Increase stock by 1"
+                                aria-label="Increase stock"
+                                className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-white rounded transition-colors disabled:opacity-30 cursor-pointer"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Edit & Delete Action Buttons */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(item)}
+                              title="Edit product details & stock"
+                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Edit2 size={12} />
+                              <span>EDIT</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(item)}
+                              title="Delete piece"
+                              aria-label={`Delete ${item.name}`}
+                              className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+
                       </div>
                     );
                   })}
@@ -1585,6 +1821,158 @@ export default function NikhilAdminDashboard({ onExit }) {
         )}
 
       </main>
+
+      {/* ========================================================
+          EDIT PRODUCT & STOCK MODAL
+      ======================================================== */}
+      {editingProduct && (
+        <div
+          onClick={() => setEditingProduct(null)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl p-5 shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <Edit2 size={16} className="text-zinc-900" />
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
+                  EDIT PRODUCT & STOCK
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProduct(null)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProductEdit} className="flex flex-col gap-3">
+              {/* Garment Title */}
+              <div>
+                <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                  GARMENT TITLE *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none"
+                />
+              </div>
+
+              {/* Price & Quantity Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                    SELLING PRICE (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={editForm.sellingPrice}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, sellingPrice: e.target.value }))}
+                    className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                    PIECES IN STOCK *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={editForm.quantity}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                    className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 font-bold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Status & Condition Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                    STATUS *
+                  </label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="SOLD">SOLD</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-zinc-900 block mb-1 uppercase tracking-wider">
+                    CONDITION
+                  </label>
+                  <select
+                    value={editForm.condition}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, condition: e.target.value }))}
+                    className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl px-3 text-sm text-zinc-900 focus:outline-none"
+                  >
+                    <option value="New / Unused">New / Unused</option>
+                    <option value="Pristine">Pristine</option>
+                    <option value="Excellent - Pre-Owned">Excellent - Pre-Owned</option>
+                    <option value="Vintage Distressed">Vintage Distressed</option>
+                    <option value="Good Pre-Owned">Good Pre-Owned</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Condition Notes */}
+              <div>
+                <label className="text-xs font-bold text-zinc-700 block mb-1 uppercase tracking-wider">
+                  CONDITION NOTES
+                </label>
+                <textarea
+                  rows={2}
+                  value={editForm.conditionNotes}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, conditionNotes: e.target.value }))}
+                  className="w-full p-2.5 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl text-sm text-zinc-900 focus:outline-none"
+                />
+              </div>
+
+              {/* Save & Cancel Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="px-4 py-2.5 rounded-xl border border-zinc-200 text-zinc-700 font-bold text-xs hover:bg-zinc-100 transition-colors cursor-pointer"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2.5 bg-[#121212] hover:bg-zinc-800 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {savingEdit ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>SAVING...</span>
+                    </>
+                  ) : (
+                    <span>SAVE CHANGES</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================
           3. DIGITAL RECEIPT MODAL OVERLAY (DARK-THEMED TICKET STYLE)

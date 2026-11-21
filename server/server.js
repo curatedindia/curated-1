@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
@@ -40,31 +39,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Multer storage config for mobile camera/file uploads (Hardened - CUR-SEC-06)
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const rawExt = path.extname(file.originalname).toLowerCase();
-    const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? rawExt : '.jpg';
-    const uniqueName = `curated_${Date.now()}_${Math.round(Math.random() * 1e5)}${ext}`;
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB maximum
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
-      return cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are permitted.'));
-    }
-    cb(null, true);
-  }
-});
 
 // Admin authentication middleware (CUR-SEC-05)
 const requireAdmin = async (req, res, next) => {
@@ -102,6 +77,16 @@ const holdCleanupTimer = setInterval(() => {
 }, 5000);
 if (holdCleanupTimer && holdCleanupTimer.unref) {
   holdCleanupTimer.unref();
+}
+
+// Helper: collision-resistant order number generator
+let orderSeqCounter = 0;
+function generateOrderNumber() {
+  const timePart = Date.now().toString(36).toUpperCase();
+  orderSeqCounter = (orderSeqCounter + 1) % 1000000;
+  const seqPart = orderSeqCounter.toString(36).toUpperCase().padStart(4, '0');
+  const randPart = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `CUR-${timePart}-${seqPart}${randPart}`;
 }
 
 // Helper: generate next SKU
@@ -244,14 +229,7 @@ app.get('/api/products/:slug', (req, res) => {
   });
 });
 
-// Admin: Upload image (Protected with requireAdmin & image filter)
-app.post('/api/upload', requireAdmin, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No file uploaded' });
-  }
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({ success: true, url: fileUrl });
-});
+
 
 // Admin: Create product with PC-12 validator (Protected with requireAdmin)
 app.post('/api/products', requireAdmin, (req, res) => {
@@ -804,7 +782,7 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
 
     console.log(`[RAZORPAY VERIFIED] Payment ID: ${razorpay_payment_id} | Order ID: ${razorpay_order_id}`);
 
-    const finalOrderNumber = order_number || `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+    const finalOrderNumber = order_number || generateOrderNumber();
     const finalTotal = Number(total_amount || total || 0);
 
     const newOrder = {
@@ -833,33 +811,75 @@ app.post(['/api/razorpay/verify-payment', '/razorpay/verify-payment'], async (re
       created_at: new Date().toISOString()
     };
 
-    // Update in-memory db
-    const existing = db.data.orders.find((o) => o.order_number === finalOrderNumber);
-    if (!existing) {
-      db.data.orders.unshift(newOrder);
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          const prod = db.data.products?.find((p) => p.id === item.product_id);
-          if (prod) {
-            prod.pieces_sold = (prod.pieces_sold || 0) + (item.quantity || 1);
-            if (prod.total_available !== undefined) {
-              prod.total_available = Math.max(0, prod.total_available - (item.quantity || 1));
-              if (prod.total_available === 0) {
-                prod.status = 'SOLD_OUT';
-                prod.sold_at = new Date().toISOString();
-              }
-            }
-          }
-        }
-      }
-      db.save();
-    }
-
     // Sync to Supabase orders table (using service role or publishable client)
     const targetSupabase = supabaseAdmin || createClient(
       supabaseUrl,
       process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq'
     );
+
+    // Atomically decrement total_available on purchased products in Supabase 'products' table and update local db.data
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const prodId = item.product_id || item.id;
+        const qty = Number(item.quantity || 1);
+
+        // Update local db.data if present
+        if (db && db.data && Array.isArray(db.data.products)) {
+          const localProd = db.data.products.find((p) => p.id === prodId || (item.sku && p.sku === item.sku));
+          if (localProd) {
+            localProd.pieces_sold = (localProd.pieces_sold || 0) + qty;
+            const currentAvail = localProd.total_available !== undefined && localProd.total_available !== null
+              ? Number(localProd.total_available)
+              : 1;
+            const remaining = currentAvail - qty;
+            localProd.total_available = Math.max(0, remaining);
+            if (remaining <= 0) {
+              localProd.status = 'SOLD_OUT';
+              localProd.sold_at = new Date().toISOString();
+            }
+          }
+        }
+
+        // Atomically update Supabase products table
+        if (targetSupabase && prodId) {
+          try {
+            const { data: currentProduct, error: fetchErr } = await targetSupabase
+              .from('products')
+              .select('id, total_available, status, pieces_sold')
+              .eq('id', prodId)
+              .maybeSingle();
+
+            if (!fetchErr && currentProduct) {
+              const currentAvail = currentProduct.total_available !== undefined && currentProduct.total_available !== null
+                ? Number(currentProduct.total_available)
+                : 1;
+              const remaining = currentAvail - qty;
+              const updateData = {
+                total_available: Math.max(0, remaining),
+                pieces_sold: (Number(currentProduct.pieces_sold) || 0) + qty
+              };
+              if (remaining <= 0) {
+                updateData.status = 'SOLD_OUT';
+                updateData.sold_at = new Date().toISOString();
+              }
+              await targetSupabase
+                .from('products')
+                .update(updateData)
+                .eq('id', prodId);
+            }
+          } catch (prodUpdErr) {
+            console.warn('[Supabase Product Decrement Error]:', prodUpdErr.message);
+          }
+        }
+      }
+    }
+
+    // Update in-memory db orders list
+    const existing = db.data.orders.find((o) => o.order_number === finalOrderNumber);
+    if (!existing) {
+      db.data.orders.unshift(newOrder);
+      db.save();
+    }
 
     if (targetSupabase) {
       try {
@@ -920,7 +940,7 @@ app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
       shipping_address
     } = req.body || {};
 
-    const finalOrderNumber = order_number || `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+    const finalOrderNumber = order_number || generateOrderNumber();
     const finalTotal = Number(total_amount || total || 0);
     const finalPaymentStatus = payment_status || 'PAID';
 
@@ -988,42 +1008,89 @@ app.post(['/api/orders/create', '/orders/create'], async (req, res) => {
 });
 
 // Track Order Lookup (SF-33)
-app.post('/api/orders/track', (req, res) => {
-  const { order_number, mobile } = req.body;
-  if (!order_number || !mobile) {
-    return res.status(400).json({ success: false, message: 'Order number and mobile number are required.' });
-  }
-
-  const cleanOrderNum = order_number.trim().toUpperCase();
-  const cleanMobile = mobile.trim();
-
-  const order = db.data.orders.find(
-    (o) => o.order_number.toUpperCase() === cleanOrderNum && o.customer && o.customer.mobile === cleanMobile
-  );
-
-  if (!order) {
-    return res.status(404).json({
-      success: false,
-      message: 'No matching order found with that order number and mobile combination.'
-    });
-  }
-
-  res.json({
-    success: true,
-    order: {
-      order_number: order.order_number,
-      order_status: order.order_status,
-      payment_status: order.payment_status,
-      created_at: order.created_at,
-      courier: order.courier,
-      tracking_number: order.tracking_number,
-      tracking_url: order.tracking_url,
-      items: order.items,
-      total: order.total,
-      customer_city: order.customer.city,
-      customer_state: order.customer.state
+app.post('/api/orders/track', async (req, res) => {
+  try {
+    const { order_number, mobile } = req.body || {};
+    if (!order_number || !mobile) {
+      return res.status(400).json({ success: false, message: 'Order number and mobile number are required.' });
     }
-  });
+
+    const cleanOrderNum = String(order_number).trim();
+    const cleanMobile = String(mobile).trim();
+    const targetDigits = cleanMobile.replace(/\D/g, '');
+
+    const client = supabaseAdmin || createClient(
+      supabaseUrl,
+      process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_HUnzC5IyK0POGKq_bllJ9g_f4aiAJSq'
+    );
+
+    let order = null;
+
+    if (client) {
+      const { data, error } = await client
+        .from('orders')
+        .select('*')
+        .ilike('order_number', cleanOrderNum);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        order = data.find((o) => {
+          const shipMobile = o.shipping_address?.mobile || o.shipping_address?.phone || o.shipping_address?.phoneNumber;
+          const custMobile = o.customer?.mobile || o.customer?.phone || o.phone_number;
+          const shipDigits = shipMobile ? String(shipMobile).replace(/\D/g, '') : '';
+          const custDigits = custMobile ? String(custMobile).replace(/\D/g, '') : '';
+
+          return (
+            (shipDigits && (shipDigits === targetDigits || shipDigits.endsWith(targetDigits) || targetDigits.endsWith(shipDigits))) ||
+            (custDigits && (custDigits === targetDigits || custDigits.endsWith(targetDigits) || targetDigits.endsWith(custDigits)))
+          );
+        });
+      }
+    }
+
+    // Fallback to local db if not found in Supabase
+    if (!order && db?.data?.orders) {
+      order = db.data.orders.find((o) => {
+        const matchesNum = o.order_number && o.order_number.trim().toUpperCase() === cleanOrderNum.toUpperCase();
+        if (!matchesNum) return false;
+        const shipMobile = o.shipping_address?.mobile || o.shipping_address?.phone;
+        const custMobile = o.customer?.mobile || o.customer?.phone;
+        const shipDigits = shipMobile ? String(shipMobile).replace(/\D/g, '') : '';
+        const custDigits = custMobile ? String(custMobile).replace(/\D/g, '') : '';
+
+        return (
+          (shipDigits && (shipDigits === targetDigits || shipDigits.endsWith(targetDigits) || targetDigits.endsWith(shipDigits))) ||
+          (custDigits && (custDigits === targetDigits || custDigits.endsWith(targetDigits) || targetDigits.endsWith(custDigits)))
+        );
+      });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching order found with that order number and mobile combination.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      order: {
+        order_number: order.order_number,
+        order_status: order.order_status || order.status || 'CONFIRMED',
+        payment_status: order.payment_status || 'PAID',
+        created_at: order.created_at,
+        courier: order.courier || null,
+        tracking_number: order.tracking_number || null,
+        tracking_url: order.tracking_url || null,
+        items: order.items || [],
+        total: order.total || order.total_amount || 0,
+        customer_city: order.shipping_address?.city || order.customer?.city || null,
+        customer_state: order.shipping_address?.state || order.customer?.state || null
+      }
+    });
+  } catch (err) {
+    console.error('[Track Order Error]:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error tracking order.' });
+  }
 });
 
 // Admin: Get all orders (Protected with requireAdmin)
@@ -1574,43 +1641,6 @@ app.post('/api/contact', (req, res) => {
   res.json({ success: true, message: 'Thank you for reaching out. We will get back to you shortly.' });
 });
 
-// Newsletter / Drop Notification Subscription ("STAY TUNED")
-app.post('/api/newsletter/subscribe', (req, res) => {
-  const { email } = req.body;
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
-  }
-
-  if (!db.data.subscribers) {
-    db.data.subscribers = [];
-  }
-
-  const normalized = email.trim().toLowerCase();
-  const existing = db.data.subscribers.find((s) => s.email === normalized);
-  if (existing) {
-    return res.json({
-      success: true,
-      alreadySubscribed: true,
-      message: "You're already on the drop alert list! We'll notify you as soon as new pieces arrive."
-    });
-  }
-
-  const newSub = {
-    id: 'sub-' + Date.now(),
-    email: normalized,
-    created_at: new Date().toISOString(),
-    status: 'ACTIVE'
-  };
-
-  db.data.subscribers.unshift(newSub);
-  db.logActivity('NEWSLETTER_SUBSCRIBE', 'MARKETING', newSub.id, `New drop notification subscriber: ${normalized}`, 'STOREFRONT');
-  db.save();
-
-  res.json({
-    success: true,
-    message: "You're all set! We will notify you on email the moment a new batch drops."
-  });
-});
 
 // List Subscribers (Admin/Marketing)
 app.get('/api/newsletter/subscribers', (req, res) => {
@@ -1723,129 +1753,6 @@ app.post('/api/test/parallel-purchase', async (req, res) => {
   });
 });
 
-// ========================================================
-// EMAIL BROADCAST ROUTE (/api/broadcast)
-// Authorized exclusively for admin via requireAdmin
-// ========================================================
-app.post(['/api/broadcast', '/broadcast'], requireAdmin, async (req, res) => {
-  try {
-    const { subject, message } = req.body || {};
-
-    if (!subject || !subject.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Subject line is required.'
-      });
-    }
-
-    if (!message || !message.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Message content is required.'
-      });
-    }
-
-    // 2. Fetch all emails from newsletter_subscribers using Supabase Service Role Key
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://mfznxaembyaqxskltnye.supabase.co';
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!serviceRoleKey) {
-      return res.status(500).json({
-        success: false,
-        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured in backend environment.'
-      });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: subscribers, error: fetchError } = await supabaseAdmin
-      .from('newsletter_subscribers')
-      .select('email');
-
-    if (fetchError) {
-      console.error('[Broadcast] Error querying newsletter_subscribers:', fetchError);
-      return res.status(500).json({
-        success: false,
-        error: `Failed to fetch subscriber list: ${fetchError.message}`
-      });
-    }
-
-    if (!subscribers || subscribers.length === 0) {
-      return res.json({
-        success: true,
-        count: 0,
-        message: 'No subscribers found on the drop list.'
-      });
-    }
-
-    const recipientEmails = subscribers
-      .map((s) => s.email && s.email.trim())
-      .filter((em) => em && em.includes('@'));
-
-    if (recipientEmails.length === 0) {
-      return res.json({
-        success: true,
-        count: 0,
-        message: 'No valid subscriber email addresses found.'
-      });
-    }
-
-    // 3. Configure Nodemailer with hello.curatedindia@gmail.com and EMAIL_APP_PASSWORD
-    const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
-    if (!emailAppPassword) {
-      return res.status(500).json({
-        success: false,
-        error: 'EMAIL_APP_PASSWORD is not configured in backend environment.'
-      });
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: 'hello.curatedindia@gmail.com',
-        pass: emailAppPassword.replace(/\s+/g, '')
-      }
-    });
-
-    // 4. Send email with subject & message, BCC to protect privacy
-    const mailOptions = {
-      from: '"CURATED DROP ALERTS" <hello.curatedindia@gmail.com>',
-      to: 'hello.curatedindia@gmail.com',
-      bcc: recipientEmails,
-      subject: subject.trim(),
-      text: message.trim(),
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px 20px; background-color: #0B0B0C; color: #FFFFFF; border-radius: 8px;">
-          <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #27272A;">
-            <h1 style="font-size: 22px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; color: #FFFFFF;">CURATED</h1>
-            <p style="font-size: 11px; color: #A1A1AA; letter-spacing: 0.08em; text-transform: uppercase; margin: 6px 0 0;">Archival Streetwear • Drop Alert</p>
-          </div>
-          <div style="padding: 28px 0; font-size: 15px; line-height: 1.7; color: #E4E4E7; white-space: pre-wrap;">${message.trim()}</div>
-          <div style="text-align: center; padding-top: 20px; border-top: 1px solid #27272A; font-size: 11px; color: #71717A;">
-            <p style="margin: 0;">You received this private notification because you joined the Curated India drop alert list.</p>
-            <p style="margin: 4px 0 0;">Curated India • Authentic 1-of-1 Streetwear</p>
-          </div>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    console.log(`[Broadcast] Successfully sent drop alert "${subject}" to ${recipientEmails.length} subscribers.`);
-
-    return res.json({
-      success: true,
-      count: recipientEmails.length,
-      message: `Sent to ${recipientEmails.length} subscribers`
-    });
-
-  } catch (err) {
-    console.error('[Broadcast] Internal error during broadcast:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Failed to send broadcast alert.'
-    });
-  }
-});
 
 // ========================================================
 // PUBLIC NEWSLETTER SUBSCRIBE ENDPOINT (/api/newsletter/subscribe)

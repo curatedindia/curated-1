@@ -2,7 +2,9 @@ import React from 'react';
 import { Eye } from 'lucide-react';
 
 export default function ProductCard({ product, onSelectProduct }) {
-  const isSoldOut = product.status === 'SOLD_OUT' || product.total_on_hand <= 0;
+  const isSoldOut = product.status === 'SOLD_OUT' || product.status === 'SOLD' ||
+    (product.total_available !== undefined && product.total_available !== null && Number(product.total_available) <= 0) ||
+    (product.total_on_hand !== undefined && product.total_on_hand !== null && Number(product.total_on_hand) <= 0);
   const isHeld = !isSoldOut && product.total_available === 0 && product.total_reserved > 0;
 
   const primaryVariant = product.variants && product.variants[0];

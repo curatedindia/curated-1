@@ -9,7 +9,8 @@ export default function CartDrawer({
   onRemoveItem,
   onProceedToCheckout,
   settings,
-  user
+  user,
+  products = []
 }) {
   const [unavailableItemIds, setUnavailableItemIds] = useState([]);
   const [checkingStock, setCheckingStock] = useState(false);
@@ -42,19 +43,69 @@ export default function CartDrawer({
   const checkCartStock = async () => {
     setCheckingStock(true);
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      if (data.success) {
-        const unavailable = [];
-        cartItems.forEach((item) => {
-          const matchedProd = data.products.find((p) => p.id === item.product_id);
-          const matchedVar = matchedProd?.variants?.find((v) => v.id === item.variant_id);
-          if (!matchedVar || matchedVar.available <= 0) {
-            unavailable.push(item.variant_id);
+      const productIds = cartItems.map((it) => it.product_id).filter(Boolean);
+      let latestProducts = [];
+
+      // Check live products in Supabase
+      if (productIds.length > 0) {
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .in('id', productIds);
+          if (!error && Array.isArray(data)) {
+            latestProducts = data;
           }
-        });
-        setUnavailableItemIds(unavailable);
+        } catch (sbErr) {
+          console.warn('[CartDrawer] Supabase stock check exception:', sbErr);
+        }
       }
+
+      const unavailable = [];
+      cartItems.forEach((item) => {
+        // Find in Supabase products, fallback to active products in memory
+        const matchedProd = latestProducts.find((p) => p.id === item.product_id)
+          || products.find((p) => p.id === item.product_id);
+
+        if (!matchedProd) {
+          // If product doesn't exist anywhere, mark unavailable
+          unavailable.push(item.variant_id);
+          return;
+        }
+
+        // Live product check: status === 'ACTIVE' and available stock allow checkout
+        const statusUpper = (matchedProd.status || '').toUpperCase();
+        if (statusUpper === 'SOLD_OUT' || (matchedProd.status && statusUpper !== 'ACTIVE')) {
+          unavailable.push(item.variant_id);
+          return;
+        }
+
+        // Total available stock checks (e.g. 1-of-1 pieces or depleted inventory)
+        const totalAvail = matchedProd.total_available;
+        if (totalAvail !== undefined && totalAvail !== null && Number(totalAvail) <= 0) {
+          unavailable.push(item.variant_id);
+          return;
+        }
+        const totalOnHand = matchedProd.total_on_hand;
+        if (totalOnHand !== undefined && totalOnHand !== null && Number(totalOnHand) <= 0) {
+          unavailable.push(item.variant_id);
+          return;
+        }
+
+        // Variant-level stock check if variants are defined
+        if (Array.isArray(matchedProd.variants) && matchedProd.variants.length > 0) {
+          const matchedVar = matchedProd.variants.find((v) => v.id === item.variant_id);
+          if (matchedVar) {
+            if ((matchedVar.available !== undefined && matchedVar.available !== null && Number(matchedVar.available) <= 0) ||
+                (matchedVar.stock_on_hand !== undefined && matchedVar.stock_on_hand !== null && Number(matchedVar.stock_on_hand) <= 0)) {
+              unavailable.push(item.variant_id);
+              return;
+            }
+          }
+        }
+      });
+
+      setUnavailableItemIds(unavailable);
     } catch (err) {
       console.error('Stock verification failed:', err);
     } finally {

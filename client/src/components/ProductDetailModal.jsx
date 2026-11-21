@@ -31,7 +31,9 @@ export default function ProductDetailModal({
   const [copiedLink, setCopiedLink] = useState(false);
 
   const selectedVariant = product.variants?.find((v) => v.id === selectedVariantId) || product.variants?.[0];
-  const isSoldOut = product.status === 'SOLD_OUT' || product.total_on_hand <= 0;
+  const isSoldOut = product.status === 'SOLD_OUT' || product.status === 'SOLD' ||
+    (product.total_available !== undefined && product.total_available !== null && Number(product.total_available) <= 0) ||
+    (product.total_on_hand !== undefined && product.total_on_hand !== null && Number(product.total_on_hand) <= 0);
   const isHeld = !isSoldOut && selectedVariant?.available === 0 && selectedVariant?.reserved > 0;
   const isOnlyOneLeft = !isSoldOut && !isHeld && selectedVariant?.available === 1;
 
@@ -142,7 +144,26 @@ export default function ProductDetailModal({
                 }}
               />
 
-              {product.is_new_drop && (
+              {isSoldOut ? (
+                <div style={{
+                  position: 'absolute',
+                  top: '14px',
+                  left: '14px',
+                  backgroundColor: '#121212',
+                  color: '#FFFFFF',
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-heading)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  boxShadow: 'var(--shadow-sm)',
+                  zIndex: 2
+                }}>
+                  SOLD OUT
+                </div>
+              ) : product.is_new_drop ? (
                 <div style={{
                   position: 'absolute',
                   top: '14px',
@@ -162,7 +183,7 @@ export default function ProductDetailModal({
                   <Sparkles size={12} color="#121212" />
                   NEW DROP
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Thumbnail Navigation */}

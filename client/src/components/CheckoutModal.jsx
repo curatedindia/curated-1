@@ -321,34 +321,7 @@ export default function CheckoutModal({
             created_at: new Date().toISOString()
           };
 
-          // 1. Direct Supabase insert for immediate visibility in Admin Dashboard
-          try {
-            const supabasePayload = {
-              order_number: orderRef,
-              customer_name: orderPayload.customer_name,
-              customer_email: orderPayload.customer_email,
-              total_amount: payableAmount,
-              status: 'PENDING',
-              payment_status: 'PAID',
-              items: orderPayload.items,
-              shipping_address: orderPayload.shipping_address,
-              created_at: orderPayload.created_at
-            };
-
-            const { data, error: insertError } = await supabase
-              .from('orders')
-              .insert([supabasePayload]);
-
-            if (insertError && insertError.code !== '23505') {
-              console.warn('[CheckoutModal] Supabase direct insert notice:', insertError.message);
-            } else {
-              console.log('[CheckoutModal] Order synced directly to Supabase:', orderRef);
-            }
-          } catch (sbErr) {
-            console.warn('[CheckoutModal] Supabase sync exception:', sbErr);
-          }
-
-          // 2. Call backend verification endpoint
+          // 1. Call backend verification endpoint (single authority creating verified orders)
           try {
             await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
