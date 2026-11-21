@@ -74,6 +74,13 @@ const DEFAULT_SETTINGS = {
   hero_headline: 'CURATED | SEARCHED • FILTERED • QUALITY CHECKED • HANDPICKED'
 };
 
+const configuredAdminEnv = import.meta.env.VITE_AUTHORIZED_ADMIN_EMAIL || '';
+const ADMIN_EMAILS = [
+  'hello.curatedindia@gmail.com',
+  ...configuredAdminEnv.toLowerCase().split(',').map((e) => e.trim()).filter(Boolean)
+];
+const isAdminEmail = (email) => ADMIN_EMAILS.includes((email || '').toLowerCase().trim());
+
 export default function App() {
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'shop' | 'new-drops' | 'sold-out' | 'track-order' | 'about' | 'contact' | 'nikhil' | 'policy-*'
   const [products, setProducts] = useState([]);
@@ -218,10 +225,10 @@ export default function App() {
       const hash = window.location.hash;
       const search = window.location.search;
 
-      // Lock the /nikhil route: strictly redirect to / if user.email is not hello.curatedindia@gmail.com
+      // Lock the /nikhil route: strictly redirect to / if user.email is not an authorized admin
       if (pathname === '/nikhil') {
         const email = (authUser?.email || '').toLowerCase().trim();
-        if (authUser && email !== 'hello.curatedindia@gmail.com') {
+        if (authUser && !isAdminEmail(email)) {
           window.history.replaceState({}, '', '/');
           setCurrentView('home');
         } else {
@@ -252,7 +259,7 @@ export default function App() {
         const path = window.location.pathname.replace(/\/+$/, '');
         const email = (session.user.email || '').toLowerCase().trim();
         if (path === '/nikhil') {
-          if (email !== 'hello.curatedindia@gmail.com') {
+          if (!isAdminEmail(email)) {
             window.history.replaceState({}, '', '/');
             setCurrentView('home');
           } else {
@@ -278,7 +285,7 @@ export default function App() {
         setAuthUser(session.user);
         const path = window.location.pathname.replace(/\/+$/, '');
         const email = (session.user.email || '').toLowerCase().trim();
-        if (path === '/nikhil' && email !== 'hello.curatedindia@gmail.com') {
+        if (path === '/nikhil' && !isAdminEmail(email)) {
           window.history.replaceState({}, '', '/');
           setCurrentView('home');
         }

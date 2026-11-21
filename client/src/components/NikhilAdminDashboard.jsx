@@ -28,6 +28,11 @@ import {
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
+const configuredAdminEnv = import.meta.env.VITE_AUTHORIZED_ADMIN_EMAIL || '';
+const REQUIRED_ADMIN_EMAILS = [
+  'hello.curatedindia@gmail.com',
+  ...configuredAdminEnv.toLowerCase().split(',').map((e) => e.trim()).filter(Boolean)
+];
 const REQUIRED_ADMIN_EMAIL = 'hello.curatedindia@gmail.com';
 
 export default function NikhilAdminDashboard({ onExit }) {
@@ -205,9 +210,9 @@ export default function NikhilAdminDashboard({ onExit }) {
       }
 
       const email = (user.email || '').toLowerCase().trim();
-      if (email !== REQUIRED_ADMIN_EMAIL) {
+      if (!REQUIRED_ADMIN_EMAILS.includes(email)) {
         console.warn(`[SECURITY VIOLATION] Unauthorized access attempt by: ${email}`);
-        alert(`Access Denied. Only ${REQUIRED_ADMIN_EMAIL} is authorized.`);
+        alert(`Access Denied. Only authorized administrators are permitted.`);
         try {
           await supabase.auth.signOut();
         } catch (e) {
@@ -847,7 +852,7 @@ export default function NikhilAdminDashboard({ onExit }) {
             CURATED // ADMIN
           </h1>
           <p className="text-xs text-zinc-400 mt-1 mb-6">
-            Restricted strictly to {REQUIRED_ADMIN_EMAIL}
+            Restricted strictly to authorized administrators
           </p>
 
           {authError && (

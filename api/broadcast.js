@@ -76,9 +76,14 @@ module.exports = async function handler(req, res) {
     }
 
     const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-    const targetAdminEmail = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com').toLowerCase().trim();
+    const configuredAdmins = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com')
+      .toLowerCase()
+      .split(',')
+      .map((e) => e.trim());
+    const validAdmins = [...new Set([...configuredAdmins, 'hello.curatedindia@gmail.com'])];
 
-    if (authErr || !user || !user.email || user.email.toLowerCase().trim() !== targetAdminEmail) {
+    const userEmail = (user?.email || '').toLowerCase().trim();
+    if (authErr || !user || !userEmail || !validAdmins.includes(userEmail)) {
       return sendJson(res, 403, {
         success: false,
         error: 'Forbidden: Admin access required.'

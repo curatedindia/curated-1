@@ -57,9 +57,14 @@ const requireAdmin = async (req, res, next) => {
     );
 
     const { data: { user }, error } = await clientForAuth.auth.getUser(token);
-    const targetAdminEmail = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com').toLowerCase().trim();
+    const configuredAdmins = (process.env.AUTHORIZED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'hello.curatedindia@gmail.com')
+      .toLowerCase()
+      .split(',')
+      .map((e) => e.trim());
+    const validAdmins = [...new Set([...configuredAdmins, 'hello.curatedindia@gmail.com'])];
 
-    if (error || !user || !user.email || user.email.toLowerCase().trim() !== targetAdminEmail) {
+    const userEmail = (user?.email || '').toLowerCase().trim();
+    if (error || !user || !userEmail || !validAdmins.includes(userEmail)) {
       return res.status(403).json({ success: false, message: 'Forbidden: Admin credentials required.' });
     }
 
