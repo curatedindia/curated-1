@@ -36,9 +36,12 @@ if (fs.existsSync(indexPath)) {
   // 4. Create dist/404.html so Vercel automatically serves the SPA on any unhandled route
   fs.copyFileSync(indexPath, path.join(distDir, '404.html'));
 
-  // 4. Sync client/dist to root /dist for universal Vercel output detection
+  // 5. Sync client/dist to root /dist for universal Vercel output detection
   const rootDist = path.join(__dirname, '..', 'dist');
   try {
+    if (!fs.existsSync(rootDist)) {
+      fs.mkdirSync(rootDist, { recursive: true });
+    }
     fs.cpSync(distDir, rootDist, { recursive: true, force: true });
     console.log('✓ Postbuild complete: Generated /checkout, /nikhil, 404.html fallbacks in client/dist and synced to root dist');
   } catch (err) {

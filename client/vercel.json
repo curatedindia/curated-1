@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/broadcast",
+      "destination": "/api/broadcast"
+    },
+    {
+      "source": "/((?!api/|uploads/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
