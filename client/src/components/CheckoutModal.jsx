@@ -10,6 +10,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useRazorpayCheckout } from '../hooks/useRazorpayCheckout';
+import AddressFormFields from './AddressFormFields';
 
 export default function CheckoutModal({
   isOpen,
@@ -35,7 +36,8 @@ export default function CheckoutModal({
     total,
     handleProceedToPayment,
     triggerRazorpayCheckout,
-    formatTimer
+    formatTimer,
+    pincodeLoading
   } = useRazorpayCheckout({
     cartItems,
     settings,
@@ -188,93 +190,11 @@ export default function CheckoutModal({
                 </div>
               )}
 
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>FULL NAME *</label>
-                <input
-                  name="name"
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="e.g. Tanmay Sharma"
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>10-DIGIT MOBILE NUMBER *</label>
-                  <input
-                    name="mobile"
-                    type="tel"
-                    inputMode="tel"
-                    required
-                    maxLength={10}
-                    value={formData.mobile}
-                    onChange={handleInputChange}
-                    placeholder="9820012345"
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>EMAIL ADDRESS *</label>
-                  <input
-                    name="email"
-                    type="email"
-                    inputMode="email"
-                    required
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="your@email.com"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>STREET ADDRESS *</label>
-                <input
-                  name="address"
-                  type="text"
-                  required
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  placeholder="Flat, building, street, landmark"
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>CITY *</label>
-                  <input
-                    name="city"
-                    type="text"
-                    required
-                    value={formData.city}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>STATE *</label>
-                  <input
-                    name="state"
-                    type="text"
-                    required
-                    value={formData.state}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>PINCODE (6-DIGIT) *</label>
-                  <input
-                    name="pincode"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    required
-                    maxLength={6}
-                    value={formData.pincode}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
+              <AddressFormFields
+                formData={formData}
+                onChange={handleInputChange}
+                pincodeLoading={pincodeLoading}
+              />
             </div>
 
             {/* CK-05: Mandatory Unchecked No Return Policy Checkbox */}

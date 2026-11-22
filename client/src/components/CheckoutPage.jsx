@@ -10,18 +10,10 @@ import {
   ShoppingBag,
   RefreshCw
 } from 'lucide-react';
-import { useCheckoutAuth } from '../hooks/useCheckoutAuth';
 import { useRazorpayCheckout } from '../hooks/useRazorpayCheckout';
+import AddressFormFields from './AddressFormFields';
 
 export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, cartItems: passedCartItems }) {
-  const {
-    user,
-    profile,
-    cartItems,
-    loading: authLoading,
-    clearCart
-  } = useCheckoutAuth(passedCartItems);
-
   const {
     step,
     setStep,
@@ -39,13 +31,15 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
     total,
     handleProceedToPayment,
     triggerRazorpayCheckout,
-    formatTimer
-  } = useRazorpayCheckout({
+    formatTimer,
+    pincodeLoading,
     cartItems,
-    settings,
-    authUser: user,
     profile,
-    clearCart,
+    authLoading
+  } = useRazorpayCheckout({
+    cartItems: passedCartItems,
+    initialCart: passedCartItems,
+    settings,
     onOrderSuccess: onOrderPlaced
   });
 
@@ -267,81 +261,12 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
                   1. DELIVERY ADDRESS
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      FULL NAME *
-                    </label>
-                    <input
-                      name="name"
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Tanmay Sharma"
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        10-DIGIT MOBILE *
-                      </label>
-                      <input
-                        name="mobile"
-                        type="tel"
-                        inputMode="tel"
-                        required
-                        maxLength={10}
-                        value={formData.mobile}
-                        onChange={handleInputChange}
-                        placeholder="9820012345"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        EMAIL ADDRESS *
-                      </label>
-                      <input
-                        name="email"
-                        type="email"
-                        inputMode="email"
-                        required
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      STREET ADDRESS *
-                    </label>
-                    <input
-                      name="address"
-                      type="text"
-                      required
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Flat, Building, Street"
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>CITY *</label>
-                      <input name="city" type="text" required value={formData.city} onChange={handleInputChange} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>STATE *</label>
-                      <input name="state" type="text" required value={formData.state} onChange={handleInputChange} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>PINCODE *</label>
-                      <input name="pincode" type="text" required maxLength={6} value={formData.pincode} onChange={handleInputChange} />
-                    </div>
-                  </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <AddressFormFields
+                    formData={formData}
+                    onChange={handleInputChange}
+                    pincodeLoading={pincodeLoading}
+                  />
                 </div>
 
                 {/* Mandatory No Return Policy Acknowledgement */}

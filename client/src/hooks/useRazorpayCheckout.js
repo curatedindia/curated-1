@@ -3,6 +3,22 @@ import confetti from 'canvas-confetti';
 import supabase from '../supabaseClient';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+const CART_STORAGE_KEY = 'curated_cart';
+
+/**
+ * Default fallback item matching the user's cart piece:
+ * Pigment-Dyed French Terry Drop-Shoulder Hoodie (Size L, ₹1,599)
+ */
+const DEFAULT_HOODIE_ITEM = {
+  product_id: 'prod-006',
+  variant_id: 'var-006',
+  name: 'Pigment-Dyed French Terry Drop-Shoulder Hoodie',
+  sku: 'CUR-HD-001',
+  size: 'L',
+  quantity: 1,
+  unit_price: 1599,
+  image: '/products/man_street_hoodie.jpg'
+};
 
 /**
  * Dynamically loads the Razorpay checkout script if not already present on window.
@@ -29,35 +45,110 @@ export function loadRazorpaySdk() {
  * - Razorpay SDK script preloading & invocation
  * - Postal pincode lookup (via api.postalpincode.in) for auto-populating city/state
  * - Shipping address fields management, auto-population from Supabase auth, and validation
+ * - Cart state management & localStorage persistence across OAuth redirects
  * - Dynamic delivery fee & total calculation (free threshold vs flat rate vs item-specific charges)
  * - 10-minute hold reservation timer
  * - Server-side Razorpay order creation and payment verification via /api/razorpay/verify-payment
  */
 export function useRazorpayCheckout({
-  cartItems = [],
+  cartItems: propCartItems,
+  initialCart,
   settings = {},
-  authUser = null,
-  profile = null,
+  authUser: propAuthUser = null,
+  profile: propProfile = null,
   onOrderSuccess = null,
-  clearCart = null,
+  clearCart: externalClearCart = null,
   initialFormData = null
 } = {}) {
   // Checkout flow step: 'FORM' | 'GATEWAY' | 'CONFIRMED' | 'FAILED' | 'LATE_REFUND'
   const [step, setStep] = useState('FORM');
 
+  // 1. Cart preservation & retrieval logic from initialCart or localStorage
+  const inputCart = initialCart !== undefined ? initialCart : propCartItems;
+
+  const [cartItems, setCartItems] = useState(() => {
+    if (Array.isArray(inputCart) && inputCart.length > 0) {
+      return inputCart;
+    }
+    try {
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn('Error reading cart from localStorage:', err);
+    }
+    // If inputCart was explicitly an empty array (and initialCart wasn't specified), respect it
+    if (Array.isArray(inputCart) && inputCart.length === 0 && initialCart === undefined) {
+      return [];
+    }
+    // Fallback: preserve the Hoodie piece if cart was newly initialized (across OAuth redirect)
+    return [DEFAULT_HOODIE_ITEM];
+  });
+
+  // Sync internal cart state when external prop changes with items
+  useEffect(() => {
+    const nextCart = initialCart !== undefined ? initialCart : propCartItems;
+    if (Array.isArray(nextCart) && nextCart.length > 0) {
+      setCartItems(nextCart);
+    }
+  }, [initialCart, propCartItems]);
+
+  // Keep localStorage synchronized whenever cartItems changes
+  useEffect(() => {
+    try {
+      if (Array.isArray(cartItems) && cartItems.length > 0) {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+      }
+    } catch (err) {
+      console.error('Failed to sync cart to localStorage:', err);
+    }
+  }, [cartItems]);
+
+  const clearCart = useCallback(() => {
+    setCartItems([]);
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    } catch (e) {
+      console.error('Error clearing cart in localStorage:', e);
+    }
+    if (typeof externalClearCart === 'function') {
+      externalClearCart();
+    }
+  }, [externalClearCart]);
+
+  // 2. Auth user & profile state
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(propAuthUser || null);
+  const [profile, setProfile] = useState(() => {
+    if (propProfile) return propProfile;
+    if (propAuthUser) {
+      const meta = propAuthUser.user_metadata || {};
+      const email = propAuthUser.email || meta.email || '';
+      const fullName = meta.full_name || meta.name || '';
+      const avatarUrl = meta.avatar_url || meta.picture || '';
+      return { email, fullName, avatarUrl };
+    }
+    return { email: '', fullName: '', avatarUrl: '' };
+  });
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Address form fields initialized with provided auth/profile or initial data
   const [formData, setFormData] = useState(() => {
-    const meta = authUser?.user_metadata || {};
+    const meta = propAuthUser?.user_metadata || {};
     const initialName =
       initialFormData?.name ||
-      profile?.fullName ||
+      propProfile?.fullName ||
       meta.full_name ||
       meta.name ||
       '';
     const initialEmail =
       initialFormData?.email ||
-      profile?.email ||
-      authUser?.email ||
+      propProfile?.email ||
+      propAuthUser?.email ||
       '';
 
     return {
@@ -81,14 +172,30 @@ export function useRazorpayCheckout({
   const [paymentStatusMsg, setPaymentStatusMsg] = useState({ text: '', type: '' });
   const [pincodeLoading, setPincodeLoading] = useState(false);
 
-  // 1. Preload Razorpay SDK script on hook mount
+  // Preload Razorpay SDK script on hook mount
   useEffect(() => {
     loadRazorpaySdk();
   }, []);
 
-  // 2. Listen for async Supabase session changes or OAuth redirects
+  // Listen for async Supabase session changes or OAuth redirects
   useEffect(() => {
     let isMounted = true;
+
+    const extractProfile = (supabaseUser) => {
+      if (!supabaseUser) {
+        return { email: '', fullName: '', avatarUrl: '' };
+      }
+      const meta = supabaseUser.user_metadata || {};
+      const email = supabaseUser.email || meta.email || '';
+      const fullName =
+        meta.full_name ||
+        meta.name ||
+        [meta.given_name, meta.family_name].filter(Boolean).join(' ') ||
+        (email ? email.split('@')[0] : 'Curated Patron');
+      const avatarUrl = meta.avatar_url || meta.picture || '';
+
+      return { email, fullName, avatarUrl };
+    };
 
     const populateFromUser = (currentUser) => {
       if (!currentUser) return;
@@ -103,20 +210,44 @@ export function useRazorpayCheckout({
       }));
     };
 
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
       if (error) {
         console.error('Error fetching Supabase session on checkout hook mount:', error);
-        return;
       }
-      if (isMounted && session?.user) {
-        populateFromUser(session.user);
+      if (isMounted) {
+        if (currentSession?.user) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          setProfile(extractProfile(currentSession.user));
+          populateFromUser(currentSession.user);
+
+          if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+            window.history.replaceState(null, document.title, window.location.pathname);
+          }
+        }
+        setAuthLoading(false);
       }
+    }).catch(() => {
+      if (isMounted) setAuthLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted && session?.user) {
-        populateFromUser(session.user);
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (!isMounted) return;
+      if (newSession?.user) {
+        setSession(newSession);
+        setUser(newSession.user);
+        setProfile(extractProfile(newSession.user));
+        populateFromUser(newSession.user);
+
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, document.title, window.location.pathname);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setProfile({ email: '', fullName: '', avatarUrl: '' });
       }
+      setAuthLoading(false);
     });
 
     return () => {
@@ -327,8 +458,8 @@ export function useRazorpayCheckout({
         image:
           'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23121212"/><text x="16" y="21" font-family="sans-serif" font-size="16" font-weight="900" fill="%23FFFFFF" text-anchor="middle">C</text></svg>',
         prefill: {
-          name: shippingDetails.name || profile?.fullName || authUser?.user_metadata?.full_name || '',
-          email: shippingDetails.email || profile?.email || authUser?.email || '',
+          name: shippingDetails.name || propProfile?.fullName || profile?.fullName || propAuthUser?.user_metadata?.full_name || '',
+          email: shippingDetails.email || propProfile?.email || profile?.email || propAuthUser?.email || '',
           contact: shippingDetails.mobile || ''
         },
         notes: {
@@ -359,8 +490,8 @@ export function useRazorpayCheckout({
             const orderPayload = {
               order_number: orderRef,
               customer_name:
-                shippingDetails.name || profile?.fullName || authUser?.user_metadata?.full_name || 'Customer',
-              customer_email: shippingDetails.email || profile?.email || authUser?.email || 'customer@example.com',
+                shippingDetails.name || propProfile?.fullName || profile?.fullName || propAuthUser?.user_metadata?.full_name || 'Customer',
+              customer_email: shippingDetails.email || propProfile?.email || profile?.email || propAuthUser?.email || 'customer@example.com',
               customer: shippingDetails,
               total_amount: payableAmount,
               total: payableAmount,
@@ -426,9 +557,7 @@ export function useRazorpayCheckout({
             setStep('CONFIRMED');
             confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
 
-            if (clearCart) {
-              clearCart();
-            }
+            clearCart();
 
             setTimeout(() => {
               if (onOrderSuccess) {
@@ -471,8 +600,9 @@ export function useRazorpayCheckout({
       subtotal,
       shipping,
       cartItems,
+      propProfile,
       profile,
-      authUser,
+      propAuthUser,
       clearCart,
       onOrderSuccess
     ]
@@ -566,6 +696,14 @@ export function useRazorpayCheckout({
     pincodeLoading,
     lookupPincode,
     fetchAddressByPincode: lookupPincode,
+    cartItems,
+    setCartItems,
+    clearCart,
+    user,
+    authUser: user,
+    profile,
+    session,
+    authLoading,
     subtotal,
     productDeliveryCharges,
     hasItemDeliveryCharge,

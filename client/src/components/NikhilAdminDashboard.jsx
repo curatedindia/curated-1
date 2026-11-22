@@ -35,6 +35,119 @@ const REQUIRED_ADMIN_EMAILS = [
 ];
 const REQUIRED_ADMIN_EMAIL = 'hello.curatedindia@gmail.com';
 
+// Reusable Helper Component: StatCard
+function StatCard({
+  variant = 'default',
+  label,
+  value,
+  subtitle,
+  icon: Icon,
+  iconSize,
+  iconClassName = '',
+  iconWrapperClassName = '',
+  labelClassName = '',
+  valueClassName = '',
+  className = '',
+  onClick,
+  trailingIcon: TrailingIcon = ChevronRight
+}) {
+  if (variant === 'dark') {
+    return (
+      <div
+        onClick={onClick}
+        className={`bg-[#121212] text-white rounded-2xl p-5 shadow-sm border border-zinc-800 relative overflow-hidden ${
+          onClick ? 'cursor-pointer' : ''
+        } ${className}`}
+      >
+        <div className="flex items-center justify-between mb-1.5">
+          <span className={`text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase ${labelClassName}`}>
+            {label}
+          </span>
+          {Icon && (
+            <div className={`w-7 h-7 rounded-full bg-emerald-950/80 border border-emerald-800 flex items-center justify-center ${iconWrapperClassName}`}>
+              <Icon size={iconSize || 14} className={`text-emerald-400 ${iconClassName}`} />
+            </div>
+          )}
+        </div>
+        <div className={`text-3xl sm:text-4xl font-black text-white tracking-tight ${valueClassName}`}>
+          {value}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'horizontal') {
+    return (
+      <div
+        onClick={onClick}
+        className={`bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex items-center justify-between cursor-pointer hover:border-zinc-300 transition-all ${className}`}
+      >
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div className={`w-10 h-10 bg-zinc-100 rounded-xl text-zinc-800 flex items-center justify-center shrink-0 ${iconWrapperClassName}`}>
+              <Icon size={iconSize || 18} className={iconClassName} />
+            </div>
+          )}
+          <div>
+            <div className={`text-sm font-black text-zinc-900 ${valueClassName}`}>
+              {value}
+            </div>
+            {subtitle && (
+              <div className="text-xs text-zinc-400">
+                {subtitle}
+              </div>
+            )}
+          </div>
+        </div>
+        {TrailingIcon && <TrailingIcon size={18} className="text-zinc-400" />}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-2xl p-4 shadow-xs cursor-pointer transition-all flex flex-col justify-between ${className}`}
+    >
+      <div className="flex items-center justify-between">
+        <span className={`text-[11px] font-bold uppercase tracking-wider ${labelClassName || 'text-zinc-500'}`}>
+          {label}
+        </span>
+        {Icon && <Icon size={iconSize || 16} className={iconClassName} />}
+      </div>
+      <div className={`text-2xl sm:text-3xl font-black mt-2 ${valueClassName || 'text-zinc-900'}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// Reusable Helper Component: MeasurementInput
+function MeasurementInput({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  step = '0.5',
+  className = ''
+}) {
+  return (
+    <div className={className}>
+      <span className="text-[10px] text-zinc-500 uppercase font-bold">{label}</span>
+      <input
+        type="number"
+        step={step}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full h-10 bg-white border border-zinc-200 rounded-lg px-2.5 text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
+      />
+    </div>
+  );
+}
+
 export default function NikhilAdminDashboard({ onExit }) {
   // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'drop-alerts'
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -1001,89 +1114,57 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* Total Revenue Display Card */}
-            <div className="bg-[#121212] text-white rounded-2xl p-5 shadow-sm border border-zinc-800 relative overflow-hidden">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
-                  REVENUE ({revenueTimeframe.toUpperCase()})
-                </span>
-                <div className="w-7 h-7 rounded-full bg-emerald-950/80 border border-emerald-800 flex items-center justify-center">
-                  <TrendingUp size={14} className="text-emerald-400" />
-                </div>
-              </div>
-              <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                ₹{revenue.toLocaleString('en-IN')}
-              </div>
-            </div>
+            <StatCard
+              variant="dark"
+              label={`REVENUE (${revenueTimeframe.toUpperCase()})`}
+              value={`₹${revenue.toLocaleString('en-IN')}`}
+              icon={TrendingUp}
+            />
 
             {/* 2-Column Counts Grid: PACKED vs PENDING */}
             <div className="grid grid-cols-2 gap-3">
-              
               {/* Packed Orders Card */}
-              <div
+              <StatCard
+                label="PACKED"
+                value={packedCount}
+                icon={CheckCircle2}
+                iconClassName="text-emerald-600"
+                valueClassName="text-emerald-600"
+                className="border border-zinc-200 hover:border-zinc-300"
                 onClick={() => {
                   setActiveTab('orders');
                   setOrderStatusFilter('PACKED');
                 }}
-                className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-zinc-300 transition-all flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between text-zinc-500">
-                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-                    PACKED
-                  </span>
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                </div>
-                <div className="text-2xl sm:text-3xl font-black text-emerald-600 mt-2">
-                  {packedCount}
-                </div>
-              </div>
+              />
 
               {/* Pending Orders Card */}
-              <div
+              <StatCard
+                label="PENDING"
+                value={pendingCount}
+                icon={Clock}
+                iconClassName={pendingCount > 0 ? 'text-amber-600' : 'text-zinc-400'}
+                labelClassName={pendingCount > 0 ? 'text-amber-700' : 'text-zinc-500'}
+                className={
+                  pendingCount > 0
+                    ? 'border border-amber-300/80 bg-amber-50/15'
+                    : 'border border-zinc-200 hover:border-zinc-300'
+                }
                 onClick={() => {
                   setActiveTab('orders');
                   setOrderStatusFilter('PENDING');
                 }}
-                className={`bg-white rounded-2xl p-4 shadow-xs cursor-pointer transition-all flex flex-col justify-between ${
-                  pendingCount > 0
-                    ? 'border border-amber-300/80 bg-amber-50/15'
-                    : 'border border-zinc-200 hover:border-zinc-300'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                    pendingCount > 0 ? 'text-amber-700' : 'text-zinc-500'
-                  }`}>
-                    PENDING
-                  </span>
-                  <Clock size={16} className={pendingCount > 0 ? 'text-amber-600' : 'text-zinc-400'} />
-                </div>
-                <div className="text-2xl sm:text-3xl font-black text-zinc-900 mt-2">
-                  {pendingCount}
-                </div>
-              </div>
-
+              />
             </div>
 
             {/* Catalog Count Summary Card */}
-            <div
+            <StatCard
+              variant="horizontal"
+              icon={Package}
+              value={`${catalogCount} Catalog Pieces`}
+              subtitle="Active inventory"
+              trailingIcon={ChevronRight}
               onClick={() => setActiveTab('catalog')}
-              className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex items-center justify-between cursor-pointer hover:border-zinc-300 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-zinc-100 rounded-xl text-zinc-800 flex items-center justify-center shrink-0">
-                  <Package size={18} />
-                </div>
-                <div>
-                  <div className="text-sm font-black text-zinc-900">
-                    {catalogCount} Catalog Pieces
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Active inventory
-                  </div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="text-zinc-400" />
-            </div>
+            />
 
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-2.5 mt-0.5">
@@ -1479,54 +1560,21 @@ export default function NikhilAdminDashboard({ onExit }) {
                     MEASUREMENTS (INCHES)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Chest</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        name="chest"
-                        value={productForm.chest}
+                    {[
+                      { label: 'Chest', name: 'chest', placeholder: '46' },
+                      { label: 'Length', name: 'length', placeholder: '29' },
+                      { label: 'Shoulder', name: 'shoulder', placeholder: '21' },
+                      { label: 'Sleeve', name: 'sleeve', placeholder: '10' }
+                    ].map((field) => (
+                      <MeasurementInput
+                        key={field.name}
+                        label={field.label}
+                        name={field.name}
+                        value={productForm[field.name]}
                         onChange={handleProductFormChange}
-                        placeholder="46"
-                        className="w-full h-10 bg-white border border-zinc-200 rounded-lg px-2.5 text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
+                        placeholder={field.placeholder}
                       />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Length</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        name="length"
-                        value={productForm.length}
-                        onChange={handleProductFormChange}
-                        placeholder="29"
-                        className="w-full h-10 bg-white border border-zinc-200 rounded-lg px-2.5 text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Shoulder</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        name="shoulder"
-                        value={productForm.shoulder}
-                        onChange={handleProductFormChange}
-                        placeholder="21"
-                        className="w-full h-10 bg-white border border-zinc-200 rounded-lg px-2.5 text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold">Sleeve</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        name="sleeve"
-                        value={productForm.sleeve}
-                        onChange={handleProductFormChange}
-                        placeholder="10"
-                        className="w-full h-10 bg-white border border-zinc-200 rounded-lg px-2.5 text-sm text-zinc-900 focus:outline-none focus:border-zinc-800"
-                      />
-                    </div>
+                    ))}
                   </div>
                 </div>
 
