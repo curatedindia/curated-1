@@ -1,392 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   ShieldCheck,
   CreditCard,
-  Lock,
   Clock,
   AlertTriangle,
   CheckCircle,
   ArrowRight,
   ArrowLeft,
   ShoppingBag,
-  ExternalLink,
-  Smartphone,
-  Check,
   RefreshCw
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import supabase from '../supabaseClient';
 import { useCheckoutAuth } from '../hooks/useCheckoutAuth';
-
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
-
-function loadRazorpaySdk() {
-  return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
+import { useRazorpayCheckout } from '../hooks/useRazorpayCheckout';
 
 export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, cartItems: passedCartItems }) {
   const {
     user,
     profile,
     cartItems,
-    subtotal,
-    shippingFee,
-    isFreeShipping,
-    total,
     loading: authLoading,
-    authError,
     clearCart
   } = useCheckoutAuth(passedCartItems);
 
-  const [step, setStep] = useState('FORM'); // 'FORM' | 'GATEWAY' | 'CONFIRMED' | 'FAILED'
-  const [formData, setFormData] = useState({
-    name: '',
-    mobile: '',
-    email: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: ''
+  const {
+    step,
+    setStep,
+    formData,
+    handleInputChange,
+    policyAck,
+    setPolicyAck,
+    submitting,
+    errorMessage,
+    currentOrder,
+    holdSecondsLeft,
+    paymentStatusMsg,
+    subtotal,
+    shippingFee,
+    total,
+    handleProceedToPayment,
+    triggerRazorpayCheckout,
+    formatTimer
+  } = useRazorpayCheckout({
+    cartItems,
+    settings,
+    authUser: user,
+    profile,
+    clearCart,
+    onOrderSuccess: onOrderPlaced
   });
-
-  const [policyAck, setPolicyAck] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [currentOrder, setCurrentOrder] = useState(null);
-  const [razorpayOrderData, setRazorpayOrderData] = useState(null);
-  const [holdExpiresAt, setHoldExpiresAt] = useState(null);
-  const [holdSecondsLeft, setHoldSecondsLeft] = useState(600);
-  const [paymentStatusMsg, setPaymentStatusMsg] = useState({ text: '', type: '' });
-
-  // When the page mounts or when a Supabase Auth session is detected:
-  useEffect(() => {
-    let isMounted = true;
-
-    // Helper to safely populate Name and Email in state if they are empty
-    const populateFromUser = (currentUser) => {
-      if (!currentUser) return;
-      const extractedEmail = currentUser.email || '';
-      const meta = currentUser.user_metadata || {};
-      const extractedName = meta.full_name || meta.name || '';
-
-      setFormData((prev) => ({
-        ...prev,
-        name: prev.name.trim() !== '' ? prev.name : extractedName,
-        email: prev.email.trim() !== '' ? prev.email : extractedEmail
-      }));
-    };
-
-    // 1. Get the current user session using supabase.auth.getSession() on mount
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Error fetching Supabase session on mount:', error);
-        return;
-      }
-      if (isMounted && session?.user) {
-        populateFromUser(session.user);
-      }
-    });
-
-    // 2. Listen for Supabase Auth session events (e.g. after Google OAuth redirect)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (isMounted && session?.user) {
-        populateFromUser(session.user);
-      }
-    });
-
-    // Preload Razorpay SDK script in background
-    loadRazorpaySdk();
-
-    return () => {
-      isMounted = false;
-      authListener?.subscription?.unsubscribe();
-    };
-  }, []);
-
-  // 10-Minute Hold Reservation countdown timer
-  useEffect(() => {
-    let timer;
-    if (step === 'GATEWAY' && holdExpiresAt) {
-      timer = setInterval(() => {
-        const remaining = Math.max(0, Math.round((new Date(holdExpiresAt) - new Date()) / 1000));
-        setHoldSecondsLeft(remaining);
-        if (remaining <= 0) {
-          clearInterval(timer);
-          setErrorMessage('Hold reservation expired. This 1-of-1 piece has been released.');
-          setStep('FAILED');
-        }
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [step, holdExpiresAt]);
-
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // Launch Razorpay Checkout Popup with valid Order ID
-  const triggerRazorpayCheckout = async (orderRef, customAmount = null) => {
-    setSubmitting(true);
-    setErrorMessage('');
-    setPaymentStatusMsg({ text: 'Initializing secure Razorpay payment window...', type: 'info' });
-
-    const sdkLoaded = await loadRazorpaySdk();
-    if (!sdkLoaded || !window.Razorpay) {
-      setSubmitting(false);
-      setStep('GATEWAY');
-      setErrorMessage('Unable to load Razorpay payment gateway. Please check your internet connection.');
-      return;
-    }
-
-    let shippingDetails = formData;
-    try {
-      const savedShipping = localStorage.getItem('checkout_shipping');
-      if (savedShipping) {
-        shippingDetails = { ...formData, ...JSON.parse(savedShipping) };
-      }
-    } catch (e) {}
-
-    const payableAmount = customAmount !== null ? customAmount : total;
-    const amountInPaise = Math.round(payableAmount * 100);
-
-    // 1. Create order on server to obtain mandatory Razorpay order_id and key_id
-    let rzpOrderId = null;
-    let serverKeyId = null;
-    try {
-      const res = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: payableAmount,
-          currency: 'INR',
-          receipt: orderRef,
-          subtotal: subtotal,
-          shipping: shippingFee,
-          delivery_charge: shippingFee,
-          items: cartItems.map(it => ({
-            product_id: it.product_id,
-            variant_id: it.variant_id,
-            sku: it.sku,
-            unit_price: it.unit_price || it.selling_price || it.price,
-            delivery_charge: it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge !== undefined ? it.deliveryCharge : 0),
-            deliveryCharge: it.deliveryCharge !== undefined ? it.deliveryCharge : (it.delivery_charge !== undefined ? it.delivery_charge : 0),
-            quantity: it.quantity || 1
-          })),
-          notes: {
-            order_number: orderRef,
-            customer_name: shippingDetails.name,
-            customer_email: shippingDetails.email,
-            customer_mobile: shippingDetails.mobile
-          }
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.order_id) {
-          rzpOrderId = data.order_id;
-          serverKeyId = data.key_id;
-          setRazorpayOrderData(data);
-        }
-      }
-    } catch (apiErr) {
-      console.warn('Backend order creation notice:', apiErr);
-    }
-
-    const key = serverKeyId || RAZORPAY_KEY_ID;
-
-    const options = {
-      key: key,
-      amount: amountInPaise,
-      currency: 'INR',
-      name: 'CURATED',
-      description: `Order #${orderRef} • 1-of-1 Archival Piece`,
-      ...(rzpOrderId ? { order_id: rzpOrderId } : {}),
-      image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23121212"/><text x="16" y="21" font-family="sans-serif" font-size="16" font-weight="900" fill="%23FFFFFF" text-anchor="middle">C</text></svg>',
-      prefill: {
-        name: shippingDetails.name || profile?.fullName || '',
-        email: shippingDetails.email || profile?.email || '',
-        contact: shippingDetails.mobile || ''
-      },
-      notes: {
-        order_number: orderRef,
-        address: shippingDetails.address || '',
-        city: shippingDetails.city || '',
-        pincode: shippingDetails.pincode || ''
-      },
-      theme: {
-        color: '#121212'
-      },
-      modal: {
-        confirm_close: true,
-        ondismiss: function () {
-          setSubmitting(false);
-          setStep('GATEWAY');
-          setPaymentStatusMsg({
-            text: 'Payment was closed. You can complete your payment below before the reservation expires.',
-            type: 'warning'
-          });
-        }
-      },
-      handler: async function (response) {
-        setSubmitting(true);
-        setPaymentStatusMsg({ text: 'Verifying payment with bank servers...', type: 'info' });
-
-        try {
-          const orderPayload = {
-            order_number: orderRef,
-            customer_name: shippingDetails.name || profile?.fullName || 'Customer',
-            customer_email: shippingDetails.email || profile?.email || 'customer@example.com',
-            customer: shippingDetails,
-            total_amount: payableAmount,
-            total: payableAmount,
-            status: 'PENDING',
-            payment_status: 'PAID',
-            payment_mode: 'RAZORPAY',
-            gateway_id: response.razorpay_payment_id,
-            gateway_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id || rzpOrderId || '',
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature || '',
-            items: cartItems.map((it) => ({
-              product_id: it.id || it.product_id,
-              name: it.name || it.title,
-              sku: it.sku || 'CUR-ITEM',
-              size: it.size || 'One Size',
-              price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
-              unit_price: parseFloat(it.price || it.selling_price || it.unit_price) || 0,
-              delivery_charge: parseFloat(it.delivery_charge !== undefined ? it.delivery_charge : (it.deliveryCharge || 0)) || 0,
-              quantity: parseInt(it.quantity, 10) || 1
-            })),
-            shipping_address: {
-              ...shippingDetails,
-              payment_mode: 'RAZORPAY',
-              razorpay_order_id: response.razorpay_order_id || rzpOrderId || '',
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature || ''
-            },
-            created_at: new Date().toISOString()
-          };
-
-          // 1. Call backend verification endpoint (single authority creating verified orders)
-          try {
-            await fetch('/api/razorpay/verify-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(orderPayload)
-            });
-          } catch (srvErr) {
-            console.warn('[Checkout] Backend verify notice:', srvErr);
-          }
-
-          // 3. Persist order details to localStorage
-          try {
-            localStorage.removeItem('checkout_shipping');
-            localStorage.setItem('curated_last_order', JSON.stringify(orderPayload));
-            if (orderPayload.customer_email) {
-              localStorage.setItem('curated_customer_email', orderPayload.customer_email);
-            }
-            if (orderPayload.customer_name) {
-              localStorage.setItem('curated_customer_name', orderPayload.customer_name);
-            }
-          } catch (e) {}
-
-          // 4. Mark success & show celebration
-          setSubmitting(false);
-          setPaymentStatusMsg({ text: '✅ Payment Verified! Processing your order...', type: 'success' });
-          setCurrentOrder(orderPayload);
-          setStep('CONFIRMED');
-          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-          clearCart();
-
-          // Automatically redirect customer to the Orders session with approximate delivery date
-          setTimeout(() => {
-            if (onOrderPlaced) onOrderPlaced(orderPayload);
-          }, 2400);
-        } catch (err) {
-          console.error('[Checkout] Handler Error:', err);
-          setSubmitting(false);
-          setErrorMessage('Payment was processed but verification had an issue. Our concierge will confirm your order.');
-        }
-      }
-    };
-
-    try {
-      const rzpInstance = new window.Razorpay(options);
-      rzpInstance.on('payment.failed', function (failResp) {
-        setSubmitting(false);
-        setStep('GATEWAY');
-        setErrorMessage(failResp.error?.description || 'Payment failed. Please try a different payment method.');
-      });
-      rzpInstance.open();
-    } catch (e) {
-      console.error('[Razorpay Launch Error]:', e);
-      setSubmitting(false);
-      setStep('GATEWAY');
-      setErrorMessage(`Could not initialize Razorpay payment modal: ${e.message || 'Key or configuration error'}`);
-    }
-  };
-
-  // Step 1: Proceed to Payment Gateway (Open Razorpay Pop-Up Directly)
-  const handleProceedToPayment = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!policyAck) {
-      setErrorMessage('Please acknowledge the 1-of-1 No Return Policy before proceeding.');
-      return;
-    }
-
-    if (!formData.mobile || formData.mobile.length !== 10) {
-      setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
-      return;
-    }
-
-    // Persist customer shipping details in client state and localStorage
-    try {
-      localStorage.setItem('checkout_shipping', JSON.stringify(formData));
-    } catch (err) {
-      console.warn('Unable to persist shipping details in localStorage:', err);
-    }
-
-    const orderNumber = `CUR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
-    const orderId = `ord-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-    const orderData = {
-      id: orderId,
-      order_number: orderNumber,
-      customer: formData,
-      items: cartItems,
-      total: total,
-      created_at: new Date().toISOString()
-    };
-
-    setCurrentOrder(orderData);
-    setHoldExpiresAt(expiresAt);
-    setHoldSecondsLeft(600);
-    setSubmitting(true);
-
-    // Immediately trigger Razorpay pop-up window upon user tap
-    await triggerRazorpayCheckout(orderNumber, total);
-  };
-
-  const formatTimer = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
 
   if (authLoading) {
     return (
@@ -427,7 +88,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
         </div>
 
         {/* Google Authentication Status Banner */}
-        {profile.email && (
+        {profile?.email && (
           <div style={{
             marginBottom: '24px',
             padding: '14px 20px',
@@ -742,7 +403,7 @@ export default function CheckoutPage({ onBackToShop, onOrderPlaced, settings, ca
         {/* STEP 2: RAZORPAY PAYMENT GATEWAY (10-Minute Atomic Hold) */}
         {step === 'GATEWAY' && (() => {
           const cartAmountFormatted = Number(total || 0).toFixed(2);
-          const orderRef = currentOrder?.order_number || currentOrder?.id || `ORD-${Date.now()}`;
+          const orderRef = currentOrder?.order_number || currentOrder?.id || 'ORD-ACTIVE';
 
           return (
             <div className="checkout-card" style={{
