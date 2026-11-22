@@ -136,6 +136,19 @@ export default function ContactView({ settings }) {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>SEND A MESSAGE</h3>
 
+              {error && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#ef4444',
+                  fontSize: '12px'
+                }}>
+                  {error}
+                </div>
+              )}
+
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>YOUR NAME *</label>
                 <input

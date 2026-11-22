@@ -24,7 +24,10 @@ import {
   Download,
   Edit2,
   Plus,
-  Minus
+  Minus,
+  MessageSquare,
+  Phone,
+  Mail
 } from 'lucide-react';
 import supabase from '../supabaseClient';
 
@@ -149,7 +152,7 @@ function MeasurementInput({
 }
 
 export default function NikhilAdminDashboard({ onExit }) {
-  // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'drop-alerts'
+  // Mobile Navigation Tabs: 'dashboard' | 'orders' | 'catalog' | 'inquiries' | 'drop-alerts'
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Authentication & Guard State
@@ -157,6 +160,16 @@ export default function NikhilAdminDashboard({ onExit }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [authError, setAuthError] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Customer Concierge Inquiries State
+  const [inquiries, setInquiries] = useState([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inquiriesFilter, setInquiriesFilter] = useState('all'); // 'all' | 'unread' | 'resolved'
+  const [updatingInquiryId, setUpdatingInquiryId] = useState(null);
+
+  const unreadInquiriesCount = useMemo(() => {
+    return inquiries.filter((inq) => (inq.status || 'unread').toLowerCase() === 'unread').length;
+  }, [inquiries]);
 
   // Real-Time Dashboard Stats State
   const [revenue, setRevenue] = useState(0);
@@ -306,6 +319,44 @@ export default function NikhilAdminDashboard({ onExit }) {
     }
   }, []);
 
+  const fetchInquiries = useCallback(async () => {
+    setInquiriesLoading(true);
+    try {
+      // 1. Fetch directly from Supabase inquiries table
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        setInquiries(data);
+      } else {
+        // Fallback to /api/inquiries
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
+        const adminEmail = currentUser?.email || REQUIRED_ADMIN_EMAIL;
+        const res = await fetch(`/api/inquiries?adminEmail=${encodeURIComponent(adminEmail)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (Array.isArray(result)) {
+            setInquiries(result);
+          } else if (Array.isArray(result?.inquiries)) {
+            setInquiries(result.inquiries);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch inquiries:', err);
+    } finally {
+      setInquiriesLoading(false);
+    }
+  }, [currentUser]);
+
   // ========================================================
   // 1. STRICT ROUTE GUARD & AUTHENTICATION
   // If user.email is NOT exactly hello.curatedindia@gmail.com, redirect to /
@@ -340,6 +391,7 @@ export default function NikhilAdminDashboard({ onExit }) {
         setAuthChecking(false);
         fetchOrders();
         fetchCatalog();
+        fetchInquiries();
       }
       return true;
     };
@@ -361,7 +413,7 @@ export default function NikhilAdminDashboard({ onExit }) {
       }
     });
 
-    // Real-time Supabase subscriptions for orders and products
+    // Real-time Supabase subscriptions for orders, products, and inquiries
     const ordersChannel = supabase
       .channel('admin-orders-realtime')
       .on(
@@ -384,13 +436,32 @@ export default function NikhilAdminDashboard({ onExit }) {
       )
       .subscribe();
 
+    const inquiriesChannel = supabase
+      .channel('admin-inquiries-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inquiries' },
+        () => {
+          if (isMounted) fetchInquiries();
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
       authListener?.subscription?.unsubscribe();
       ordersChannel?.unsubscribe();
       productsChannel?.unsubscribe();
+      inquiriesChannel?.unsubscribe();
     };
-  }, [fetchOrders, fetchCatalog]);
+  }, [fetchOrders, fetchCatalog, fetchInquiries]);
+
+  // Fetch inquiries on tab switch
+  useEffect(() => {
+    if (activeTab === 'inquiries' && currentUser) {
+      fetchInquiries();
+    }
+  }, [activeTab, currentUser, fetchInquiries]);
 
   const handleAdminGoogleLogin = async () => {
     setIsSigningIn(true);
@@ -938,6 +1009,98 @@ export default function NikhilAdminDashboard({ onExit }) {
   };
 
   // ========================================================
+  // 6. INQUIRIES TAB: CONCIERGE & SUPPORT MANAGEMENT
+  // ========================================================
+  const handleToggleInquiryStatus = async (inquiry) => {
+    const isCurrentlyResolved = (inquiry.status || '').toLowerCase() === 'resolved';
+    const newStatus = isCurrentlyResolved ? 'unread' : 'resolved';
+
+    // Optimistic UI update
+    setInquiries((prev) =>
+      prev.map((i) => (i.id === inquiry.id ? { ...i, status: newStatus } : i))
+    );
+    setUpdatingInquiryId(inquiry.id);
+
+    try {
+      const { error: dbError } = await supabase
+        .from('inquiries')
+        .update({ status: newStatus })
+        .eq('id', inquiry.id);
+
+      if (dbError) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
+        const adminEmail = currentUser?.email || REQUIRED_ADMIN_EMAIL;
+        const res = await fetch(`/api/inquiries/${inquiry.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ status: newStatus, adminEmail })
+        });
+        if (!res.ok) throw new Error('Failed to update status');
+      }
+
+      setSuccessMessage(`Inquiry marked as ${newStatus}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to update inquiry status:', err);
+      setActionError('Failed to update inquiry status.');
+      setInquiries((prev) =>
+        prev.map((i) => (i.id === inquiry.id ? { ...i, status: inquiry.status } : i))
+      );
+      setTimeout(() => setActionError(''), 3000);
+    } finally {
+      setUpdatingInquiryId(null);
+    }
+  };
+
+  const handleDeleteInquiry = async (inquiry) => {
+    const confirmDelete = window.confirm(`Delete inquiry from "${inquiry.name}"?`);
+    if (!confirmDelete) return;
+
+    setInquiries((prev) => prev.filter((i) => i.id !== inquiry.id));
+
+    try {
+      const { error: dbError } = await supabase
+        .from('inquiries')
+        .delete()
+        .eq('id', inquiry.id);
+
+      if (dbError) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
+        const adminEmail = currentUser?.email || REQUIRED_ADMIN_EMAIL;
+        const res = await fetch(`/api/inquiries/${inquiry.id}?adminEmail=${encodeURIComponent(adminEmail)}`, {
+          method: 'DELETE',
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+        if (!res.ok) throw new Error('Failed to delete inquiry');
+      }
+
+      setSuccessMessage('Inquiry deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to delete inquiry:', err);
+      setActionError('Failed to delete inquiry.');
+      fetchInquiries();
+      setTimeout(() => setActionError(''), 3000);
+    }
+  };
+
+  const filteredInquiries = useMemo(() => {
+    return inquiries.filter((inq) => {
+      const st = (inq.status || 'unread').toLowerCase();
+      if (inquiriesFilter === 'unread' && st !== 'unread') return false;
+      if (inquiriesFilter === 'resolved' && st !== 'resolved') return false;
+      return true;
+    });
+  }, [inquiries, inquiriesFilter]);
+
+  // ========================================================
   // RENDER: LOADING CHECK
   // ========================================================
   if (authChecking) {
@@ -1166,14 +1329,32 @@ export default function NikhilAdminDashboard({ onExit }) {
               onClick={() => setActiveTab('catalog')}
             />
 
+            {/* Inquiries Count Summary Card */}
+            <StatCard
+              variant="horizontal"
+              icon={MessageSquare}
+              value={unreadInquiriesCount > 0 ? `${unreadInquiriesCount} Unread Inquiries` : `${inquiries.length} Inquiries`}
+              subtitle={unreadInquiriesCount > 0 ? `${inquiries.length} total customer inquiries` : "Customer support concierge"}
+              trailingIcon={ChevronRight}
+              onClick={() => setActiveTab('inquiries')}
+            />
+
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-2.5 mt-0.5">
+            <div className="grid grid-cols-3 gap-2 mt-0.5">
               <button
                 onClick={() => setActiveTab('catalog')}
                 className="min-h-[46px] bg-[#121212] text-white rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors shadow-xs"
               >
                 <PlusCircle size={15} />
-                <span>ADD PRODUCT</span>
+                <span>ADD PIECE</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('inquiries')}
+                className="min-h-[46px] bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+              >
+                <MessageSquare size={15} />
+                <span>INQUIRIES</span>
               </button>
 
               <button
@@ -1181,7 +1362,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 className="min-h-[46px] bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
               >
                 <Bell size={15} />
-                <span>DROP ALERT</span>
+                <span>ALERTS</span>
               </button>
             </div>
 
@@ -1873,6 +2054,205 @@ export default function NikhilAdminDashboard({ onExit }) {
           </div>
         )}
 
+        {/* ========================================================
+            TAB 5: INQUIRIES TAB (CUSTOMER CONCIERGE & SUPPORT)
+        ======================================================== */}
+        {activeTab === 'inquiries' && (
+          <div className="flex flex-col gap-3.5">
+            {/* Header & Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-extrabold uppercase tracking-wider font-mono text-zinc-900">
+                  INQUIRIES
+                </h1>
+                <span className="bg-zinc-200/80 text-zinc-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {inquiries.length}
+                </span>
+                {unreadInquiriesCount > 0 && (
+                  <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {unreadInquiriesCount} UNREAD
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={() => fetchInquiries()}
+                disabled={inquiriesLoading}
+                className="px-2.5 py-1 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              >
+                <RefreshCw size={12} className={inquiriesLoading ? 'animate-spin' : ''} />
+                <span>REFRESH</span>
+              </button>
+            </div>
+
+            {/* Segmented Filter Pills */}
+            <div className="grid grid-cols-3 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1">
+              {[
+                { id: 'all', label: `All (${inquiries.length})` },
+                { id: 'unread', label: `Unread (${unreadInquiriesCount})` },
+                { id: 'resolved', label: `Resolved (${Math.max(0, inquiries.length - unreadInquiriesCount)})` }
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setInquiriesFilter(filter.id)}
+                  className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                    inquiriesFilter === filter.id
+                      ? 'bg-[#121212] text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Inquiries Cards */}
+            {inquiriesLoading ? (
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                <Loader2 size={22} className="animate-spin mx-auto mb-2 text-zinc-500" />
+                Loading inquiries...
+              </div>
+            ) : filteredInquiries.length === 0 ? (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center text-zinc-500 shadow-xs">
+                <MessageSquare size={28} className="mx-auto mb-2 text-zinc-300" />
+                <p className="font-bold text-sm text-zinc-900">No inquiries found</p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Customer messages submitted from the contact concierge will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {filteredInquiries.map((inq) => {
+                  const isResolved = (inq.status || '').toLowerCase() === 'resolved';
+                  const isUpdating = updatingInquiryId === inq.id;
+                  const dateStr = inq.created_at ? new Date(inq.created_at).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : 'N/A';
+
+                  const cleanPhone = (inq.mobile || '').replace(/[^0-9]/g, '');
+
+                  return (
+                    <div
+                      key={inq.id}
+                      className={`bg-white border rounded-2xl p-4 shadow-xs flex flex-col gap-3 transition-all ${
+                        isResolved ? 'border-zinc-200 bg-zinc-50/50 opacity-85' : 'border-zinc-300'
+                      }`}
+                    >
+                      {/* Top Row: Customer Name, Status Badge & Timestamp */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-zinc-900 truncate">
+                              {inq.name || 'Anonymous Customer'}
+                            </span>
+                            {inq.order_number && (
+                              <span className="font-mono text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200 px-2 py-0.5 rounded-md">
+                                Order #{inq.order_number}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-zinc-400 mt-0.5 block">
+                            {dateStr}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 border ${
+                            isResolved
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : 'bg-amber-50 text-amber-700 border-amber-300'
+                          }`}
+                        >
+                          {isResolved ? 'RESOLVED ✓' : 'UNREAD'}
+                        </span>
+                      </div>
+
+                      {/* Contact Channels (Mobile, WhatsApp, Email) */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        {inq.mobile && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <a
+                              href={`tel:${inq.mobile}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-lg font-mono text-xs font-semibold transition-colors"
+                              title="Call customer"
+                            >
+                              <Phone size={12} className="text-zinc-600" />
+                              <span>{inq.mobile}</span>
+                            </a>
+                            {cleanPhone && (
+                              <a
+                                href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(inq.name || 'there')},%20regarding%20your%20inquiry%20on%20CURATED...`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-colors"
+                                title="Chat on WhatsApp"
+                              >
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {inq.email && (
+                          <a
+                            href={`mailto:${inq.email}?subject=Re:%20Inquiry%20on%20CURATED${inq.order_number ? `%20(Order%20%23${inq.order_number})` : ''}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-lg font-mono text-xs font-semibold transition-colors truncate max-w-[260px]"
+                            title="Send email"
+                          >
+                            <Mail size={12} className="text-zinc-600 shrink-0" />
+                            <span className="truncate">{inq.email}</span>
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Message Content */}
+                      <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap select-text break-words">
+                        {inq.message}
+                      </div>
+
+                      {/* Action Buttons: Mark as Resolved / Mark as Unread, Delete */}
+                      <div className="flex items-center justify-between pt-1 border-t border-zinc-100 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleInquiryStatus(inq)}
+                          disabled={isUpdating}
+                          className={`min-h-[36px] px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                            isResolved
+                              ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
+                          }`}
+                        >
+                          {isUpdating ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={13} />
+                          )}
+                          <span>{isResolved ? 'Mark as Unread' : 'Mark as Resolved'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteInquiry(inq)}
+                          title="Delete inquiry"
+                          aria-label={`Delete inquiry from ${inq.name}`}
+                          className="min-h-[36px] px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       {/* ========================================================
@@ -2234,7 +2614,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
       {/* ========================================================
           4. MOBILE-FIRST FIXED BOTTOM NAVIGATION BAR
-          Tabs: Dashboard, Orders, Catalog, Alerts
+          Tabs: Dashboard, Orders, Catalog, Inquiries, Alerts
           With iPhone Safe-Area-Inset Support
       ======================================================== */}
       <nav
@@ -2244,7 +2624,7 @@ export default function NikhilAdminDashboard({ onExit }) {
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
-        <div className="w-full max-w-md mx-auto h-full flex items-center justify-around px-2">
+        <div className="w-full max-w-lg mx-auto h-full flex items-center justify-around px-2">
           {/* Tab 1: Dashboard */}
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -2294,7 +2674,28 @@ export default function NikhilAdminDashboard({ onExit }) {
             </span>
           </button>
 
-          {/* Tab 4: Alerts */}
+          {/* Tab 4: Inquiries */}
+          <button
+            onClick={() => setActiveTab('inquiries')}
+            aria-label="Inquiries"
+            className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer relative transition-colors ${
+              activeTab === 'inquiries' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <div className="relative">
+              <MessageSquare size={19} className={activeTab === 'inquiries' ? 'text-white' : 'text-zinc-500'} />
+              {unreadInquiriesCount > 0 && (
+                <span className="absolute -top-1 -right-2 bg-amber-500 text-black text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  {unreadInquiriesCount}
+                </span>
+              )}
+            </div>
+            <span className={`text-[10px] tracking-wider uppercase whitespace-nowrap ${activeTab === 'inquiries' ? 'font-black' : 'font-medium'}`}>
+              INQUIRIES
+            </span>
+          </button>
+
+          {/* Tab 5: Alerts */}
           <button
             onClick={() => setActiveTab('drop-alerts')}
             aria-label="Alerts"

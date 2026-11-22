@@ -307,3 +307,67 @@ TO authenticated
 USING (
   LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
 );
+
+-- ==============================================================================
+-- 10. INQUIRIES TABLE (CUSTOMER SUPPORT & CONTACT MESSAGES)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.inquiries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  mobile TEXT,
+  order_number TEXT,
+  message TEXT NOT NULL,
+  status TEXT DEFAULT 'unread',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS) on inquiries table
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies to prevent duplicate policy errors
+DROP POLICY IF EXISTS "Public Can Submit Inquiries" ON public.inquiries;
+DROP POLICY IF EXISTS "Admin Read Inquiries" ON public.inquiries;
+DROP POLICY IF EXISTS "Admin Update Inquiries" ON public.inquiries;
+DROP POLICY IF EXISTS "Admin Delete Inquiries" ON public.inquiries;
+
+-- 1. Public Insert: Anyone can submit a contact inquiry
+CREATE POLICY "Public Can Submit Inquiries"
+ON public.inquiries
+FOR INSERT
+TO public
+WITH CHECK (true);
+
+-- 2. Admin Read: Only hello.curatedindia@gmail.com can view inquiries
+CREATE POLICY "Admin Read Inquiries"
+ON public.inquiries
+FOR SELECT
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- 3. Admin Update: Only hello.curatedindia@gmail.com can update status
+CREATE POLICY "Admin Update Inquiries"
+ON public.inquiries
+FOR UPDATE
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+)
+WITH CHECK (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);
+
+-- 4. Admin Delete: Only hello.curatedindia@gmail.com can delete inquiries
+CREATE POLICY "Admin Delete Inquiries"
+ON public.inquiries
+FOR DELETE
+TO authenticated
+USING (
+  LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+  OR LOWER(COALESCE(auth.jwt() -> 'user_metadata' ->> 'email', '')) = 'hello.curatedindia@gmail.com'
+);

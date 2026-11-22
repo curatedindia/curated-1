@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -462,14 +463,207 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
   }
 });
 
-// 5. CONTACT FORM SUBMISSION
-app.post(['/api/contact', '/contact'], (req, res) => {
-  const { name, message } = req.body || {};
-  if (!name || !message) {
-    return res.status(400).json({ success: false, message: 'Name and message are required' });
-  }
+// Helper: escape HTML for email templates
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-  return res.json({ success: true, message: 'Thank you for reaching out. We will get back to you shortly.' });
+// 5. CONTACT FORM SUBMISSION
+app.post(['/api/contact', '/contact'], async (req, res) => {
+  try {
+    const { name, email, mobile, order_number, message } = req.body || {};
+
+    if (!name || typeof name !== 'string' || !name.trim() || !message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Name and message are required' });
+    }
+
+    const trimmedName = name.trim();
+    const trimmedEmail = (email && typeof email === 'string') ? email.trim() : null;
+    const trimmedMobile = (mobile && typeof mobile === 'string') ? mobile.trim() : null;
+    const trimmedOrderNumber = (order_number && typeof order_number === 'string') ? order_number.trim() : null;
+    const trimmedMessage = message.trim();
+
+    // Insert into Supabase inquiries table
+    const client = supabaseAdmin || supabasePublic;
+    if (client) {
+      const { error: dbError } = await client
+        .from('inquiries')
+        .insert([{
+          name: trimmedName,
+          email: trimmedEmail,
+          mobile: trimmedMobile,
+          order_number: trimmedOrderNumber,
+          message: trimmedMessage,
+          status: 'unread'
+        }]);
+
+      if (dbError) {
+        console.error('[Contact Form] Error saving inquiry to Supabase:', dbError);
+      }
+    }
+
+    // Send email notification via nodemailer to hello.curatedindia@gmail.com
+    const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
+    if (emailAppPassword) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: 'hello.curatedindia@gmail.com',
+            pass: emailAppPassword
+          }
+        });
+
+        const subject = `New Customer Inquiry: ${trimmedName}${trimmedOrderNumber ? ` (Order #${trimmedOrderNumber})` : ''}`;
+
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff;">
+            <div style="border-bottom: 2px solid #000000; padding-bottom: 12px; margin-bottom: 20px;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">CURATED - New Customer Inquiry</h2>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+              <tbody>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; width: 140px; border: 1px solid #e5e7eb;">Customer Name</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb;">${escapeHtml(trimmedName)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb;">Mobile</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb;">${escapeHtml(trimmedMobile || 'N/A')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb;">Email</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb;">${escapeHtml(trimmedEmail || 'N/A')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb;">Order #</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb;">${escapeHtml(trimmedOrderNumber || 'N/A')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb;">Message</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb; white-space: pre-wrap; line-height: 1.5;">${escapeHtml(trimmedMessage)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-weight: 600; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb;">Timestamp</td>
+                  <td style="padding: 10px 14px; color: #111827; border: 1px solid #e5e7eb;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">This inquiry was submitted from the Curated contact form.</p>
+          </div>
+        `;
+
+        const text = `NEW CUSTOMER INQUIRY\n` +
+          `---------------------------------\n` +
+          `Customer Name: ${trimmedName}\n` +
+          `Mobile:        ${trimmedMobile || 'N/A'}\n` +
+          `Email:         ${trimmedEmail || 'N/A'}\n` +
+          `Order #:       ${trimmedOrderNumber || 'N/A'}\n` +
+          `Timestamp:     ${new Date().toISOString()}\n\n` +
+          `Message:\n${trimmedMessage}\n` +
+          `---------------------------------`;
+
+        await transporter.sendMail({
+          from: '"CURATED Support" <hello.curatedindia@gmail.com>',
+          to: 'hello.curatedindia@gmail.com',
+          replyTo: trimmedEmail || undefined,
+          subject,
+          text,
+          html
+        });
+      } catch (mailErr) {
+        console.warn('[Contact Email Warning] Failed to send email notification:', mailErr.message);
+      }
+    } else {
+      console.warn('[Contact Email Warning] EMAIL_APP_PASSWORD is missing. Skipping email notification.');
+    }
+
+    return res.json({ success: true, message: 'Thank you for reaching out. Your message has been received.' });
+  } catch (err) {
+    console.error('[Contact Form Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to process inquiry. Please try again later.' });
+  }
+});
+
+// 5b. ADMIN INQUIRIES MANAGEMENT ENDPOINTS
+app.get(['/api/inquiries', '/inquiries'], requireAdmin, async (req, res) => {
+  try {
+    const client = supabaseAdmin || supabasePublic;
+    if (!client) {
+      return res.status(500).json({ success: false, message: 'Database client unavailable' });
+    }
+    const { data, error } = await client
+      .from('inquiries')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[Admin Inquiries GET Error]:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+    return res.json({ success: true, inquiries: data || [] });
+  } catch (err) {
+    console.error('[Admin Inquiries Error]:', err);
+    return res.status(500).json({ success: false, message: 'Server error retrieving inquiries' });
+  }
+});
+
+app.patch(['/api/inquiries/:id', '/inquiries/:id'], requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    if (!status || typeof status !== 'string') {
+      return res.status(400).json({ success: false, message: 'Status is required' });
+    }
+    const client = supabaseAdmin || supabasePublic;
+    if (!client) {
+      return res.status(500).json({ success: false, message: 'Database client unavailable' });
+    }
+    const { data, error } = await client
+      .from('inquiries')
+      .update({ status: status.trim() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[Admin Inquiries PATCH Error]:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+    return res.json({ success: true, inquiry: data });
+  } catch (err) {
+    console.error('[Admin Inquiries PATCH Error]:', err);
+    return res.status(500).json({ success: false, message: 'Server error updating inquiry' });
+  }
+});
+
+app.delete(['/api/inquiries/:id', '/inquiries/:id'], requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const client = supabaseAdmin || supabasePublic;
+    if (!client) {
+      return res.status(500).json({ success: false, message: 'Database client unavailable' });
+    }
+    const { error } = await client
+      .from('inquiries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[Admin Inquiries DELETE Error]:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+    return res.json({ success: true, message: 'Inquiry deleted successfully' });
+  } catch (err) {
+    console.error('[Admin Inquiries DELETE Error]:', err);
+    return res.status(500).json({ success: false, message: 'Server error deleting inquiry' });
+  }
 });
 
 // 6. PUBLIC NEWSLETTER SUBSCRIBE ENDPOINT
