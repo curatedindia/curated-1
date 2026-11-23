@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Send, CheckCircle2 } from 'lucide-react';
+import supabase from '../supabaseClient';
 
 const InstagramIcon = ({ size = 20, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -23,26 +24,63 @@ export default function ContactView({ settings }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.name?.trim() || !formData.message?.trim()) {
+      setError('Name and message are required.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
+    let savedDirectly = false;
+    let apiDispatched = false;
+
+    // 1. Direct Supabase save (instant, client-side resilience)
+    try {
+      const { error: sbErr } = await supabase
+        .from('inquiries')
+        .insert([{
+          name: formData.name.trim(),
+          email: formData.email?.trim() || null,
+          mobile: formData.mobile?.trim() || null,
+          order_number: formData.order_number?.trim() || null,
+          message: formData.message.trim(),
+          status: 'unread'
+        }]);
+
+      if (!sbErr) {
+        savedDirectly = true;
+      } else {
+        console.warn('[ContactView] Supabase direct insert note:', sbErr);
+      }
+    } catch (sbEx) {
+      console.warn('[ContactView] Supabase direct exception:', sbEx);
+    }
+
+    // 2. Dispatch to /api/contact for email alert and backup storage
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
-      if (data.success) {
-        setSubmitted(true);
-      } else {
-        setError(data.message || 'Submission error');
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.success) {
+          apiDispatched = true;
+        }
       }
-    } catch (err) {
-      setError('Network error sending message.');
-    } finally {
-      setLoading(false);
+    } catch (apiEx) {
+      console.warn('[ContactView] API notification exception:', apiEx);
     }
+
+    if (savedDirectly || apiDispatched) {
+      setSubmitted(true);
+    } else {
+      setError('Unable to send message right now. Please email us directly at hello.curatedindia@gmail.com.');
+    }
+
+    setLoading(false);
   };
 
   const whatsappUrl = `https://wa.me/${(settings?.whatsapp_number || '+919876543210').replace(/[^0-9]/g, '')}?text=Hi%20CURATED%20team,%20I'd%20like%20to%20inquire%20about...`;

@@ -508,9 +508,10 @@ app.post(['/api/contact', '/contact'], async (req, res) => {
       }
     }
 
-    // Send email notification via nodemailer to hello.curatedindia@gmail.com
-    const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
-    if (emailAppPassword) {
+    // Send email notification via nodemailer to hello.curatedindia@gmail.com with timeout safeguard
+    const rawEmailPassword = process.env.EMAIL_APP_PASSWORD;
+    if (rawEmailPassword) {
+      const emailAppPassword = rawEmailPassword.replace(/\s+/g, '');
       try {
         const transporter = nodemailer.createTransport({
           service: 'gmail',
@@ -569,7 +570,7 @@ app.post(['/api/contact', '/contact'], async (req, res) => {
           `Message:\n${trimmedMessage}\n` +
           `---------------------------------`;
 
-        await transporter.sendMail({
+        const sendMailPromise = transporter.sendMail({
           from: '"CURATED Support" <hello.curatedindia@gmail.com>',
           to: 'hello.curatedindia@gmail.com',
           replyTo: trimmedEmail || undefined,
@@ -577,6 +578,12 @@ app.post(['/api/contact', '/contact'], async (req, res) => {
           text,
           html
         });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Email dispatch timed out after 5000ms')), 5000)
+        );
+
+        await Promise.race([sendMailPromise, timeoutPromise]);
       } catch (mailErr) {
         console.warn('[Contact Email Warning] Failed to send email notification:', mailErr.message);
       }

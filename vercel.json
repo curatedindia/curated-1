@@ -6,6 +6,10 @@
       "destination": "/api/broadcast"
     },
     {
+      "source": "/api/contact",
+      "destination": "/api/contact"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
     },
