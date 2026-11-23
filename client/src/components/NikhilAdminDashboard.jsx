@@ -1169,10 +1169,10 @@ export default function NikhilAdminDashboard({ onExit }) {
   return (
     <div className="min-h-screen w-full bg-[#F8F9FA] text-[#121212] relative overflow-x-hidden antialiased">
       
-      {/* 1. Mobile Top Header */}
-      <header className="sticky top-0 z-40 bg-[#121212]/95 backdrop-blur-md text-white border-b border-zinc-800/80 px-4 py-3">
-        <div className="w-full max-w-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      {/* 1. Top Header */}
+      <header className="sticky top-0 z-40 bg-[#121212]/95 backdrop-blur-md text-white border-b border-zinc-800/80 px-4 sm:px-6 lg:px-8 py-3">
+        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="font-extrabold text-sm tracking-wider uppercase font-mono">
               NIKHIL ADMIN
             </span>
@@ -1181,7 +1181,46 @@ export default function NikhilAdminDashboard({ onExit }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Desktop Navigation Tabs */}
+          <nav className="hidden md:flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { id: 'orders', label: 'Orders', icon: ShoppingBag, count: pendingCount, alert: true },
+              { id: 'catalog', label: 'Catalog', icon: Package },
+              { id: 'inquiries', label: 'Inquiries', icon: MessageSquare, count: unreadInquiriesCount, alert: true },
+              { id: 'drop-alerts', label: 'Alerts', icon: Bell }
+            ].map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white text-zinc-950 shadow-xs'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+                  }`}
+                >
+                  <TabIcon size={14} className={activeTab === tab.id ? 'text-zinc-950' : 'text-zinc-400'} />
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span
+                      className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                        activeTab === tab.id
+                          ? (tab.alert ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-900')
+                          : (tab.alert ? 'bg-red-600/90 text-white' : 'bg-zinc-800 text-zinc-300')
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => {
                 if (onExit) onExit();
@@ -1206,7 +1245,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
       {/* 2. Main Tab Content Container */}
       <main
-        className="w-full max-w-xl mx-auto px-4 py-4"
+        className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6"
         style={{
           paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 16px))'
         }}
@@ -1231,73 +1270,59 @@ export default function NikhilAdminDashboard({ onExit }) {
             TAB 1: REAL-TIME DASHBOARD
         ======================================================== */}
         {activeTab === 'dashboard' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
             
             {/* Header & Timeframe Filter */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h1 className="text-sm font-extrabold uppercase tracking-wider font-mono text-zinc-900">
-                  OVERVIEW
-                </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h1 className="text-sm sm:text-base font-extrabold uppercase tracking-wider font-mono text-zinc-900">
+                OVERVIEW
+              </h1>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* Native Clean Segmented Control */}
+                <div className="grid grid-cols-4 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1 flex-1 sm:flex-initial">
+                  {[
+                    { id: 'day', label: 'Day' },
+                    { id: 'month', label: 'Month' },
+                    { id: 'year', label: 'Year' },
+                    { id: 'all', label: 'All' }
+                  ].map((tf) => (
+                    <button
+                      key={tf.id}
+                      onClick={() => handleTimeframeChange(tf.id)}
+                      className={`py-1.5 px-3 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                        revenueTimeframe === tf.id
+                          ? 'bg-[#121212] text-white shadow-xs'
+                          : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                      }`}
+                    >
+                      {tf.label}
+                    </button>
+                  ))}
+                </div>
 
                 <button
                   onClick={() => {
                     fetchOrders();
                     fetchCatalog();
                   }}
-                  className="px-2.5 py-1 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                  className="px-3 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs shrink-0"
                   title="Refresh metrics"
                 >
                   <RefreshCw size={12} className={loadingOrders || loadingProducts ? 'animate-spin' : ''} />
                   <span>REFRESH</span>
                 </button>
               </div>
-
-              {/* Native Clean Segmented Control */}
-              <div className="grid grid-cols-4 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1">
-                {[
-                  { id: 'day', label: 'Day' },
-                  { id: 'month', label: 'Month' },
-                  { id: 'year', label: 'Year' },
-                  { id: 'all', label: 'All' }
-                ].map((tf) => (
-                  <button
-                    key={tf.id}
-                    onClick={() => handleTimeframeChange(tf.id)}
-                    className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
-                      revenueTimeframe === tf.id
-                        ? 'bg-[#121212] text-white shadow-xs'
-                        : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
-                    }`}
-                  >
-                    {tf.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {/* Total Revenue Display Card */}
-            <StatCard
-              variant="dark"
-              label={`REVENUE (${revenueTimeframe.toUpperCase()})`}
-              value={`₹${revenue.toLocaleString('en-IN')}`}
-              icon={TrendingUp}
-            />
-
-            {/* 2-Column Counts Grid: PACKED vs PENDING */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Packed Orders Card */}
+            {/* Responsive Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Revenue Display Card */}
               <StatCard
-                label="PACKED"
-                value={packedCount}
-                icon={CheckCircle2}
-                iconClassName="text-emerald-600"
-                valueClassName="text-emerald-600"
-                className="border border-zinc-200 hover:border-zinc-300"
-                onClick={() => {
-                  setActiveTab('orders');
-                  setOrderStatusFilter('PACKED');
-                }}
+                variant="dark"
+                label={`REVENUE (${revenueTimeframe.toUpperCase()})`}
+                value={`₹${revenue.toLocaleString('en-IN')}`}
+                icon={TrendingUp}
               />
 
               {/* Pending Orders Card */}
@@ -1317,33 +1342,48 @@ export default function NikhilAdminDashboard({ onExit }) {
                   setOrderStatusFilter('PENDING');
                 }}
               />
+
+              {/* Packed Orders Card */}
+              <StatCard
+                label="PACKED"
+                value={packedCount}
+                icon={CheckCircle2}
+                iconClassName="text-emerald-600"
+                valueClassName="text-emerald-600"
+                className="border border-zinc-200 hover:border-zinc-300"
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderStatusFilter('PACKED');
+                }}
+              />
+
+              {/* Catalog & Inquiries Summary Cards */}
+              <div className="flex flex-col gap-3">
+                <StatCard
+                  variant="horizontal"
+                  icon={Package}
+                  value={`${catalogCount} Catalog Pieces`}
+                  subtitle="Active inventory"
+                  trailingIcon={ChevronRight}
+                  onClick={() => setActiveTab('catalog')}
+                />
+
+                <StatCard
+                  variant="horizontal"
+                  icon={MessageSquare}
+                  value={unreadInquiriesCount > 0 ? `${unreadInquiriesCount} Unread Inquiries` : `${inquiries.length} Inquiries`}
+                  subtitle={unreadInquiriesCount > 0 ? `${inquiries.length} total customer inquiries` : "Customer support concierge"}
+                  trailingIcon={ChevronRight}
+                  onClick={() => setActiveTab('inquiries')}
+                />
+              </div>
             </div>
 
-            {/* Catalog Count Summary Card */}
-            <StatCard
-              variant="horizontal"
-              icon={Package}
-              value={`${catalogCount} Catalog Pieces`}
-              subtitle="Active inventory"
-              trailingIcon={ChevronRight}
-              onClick={() => setActiveTab('catalog')}
-            />
-
-            {/* Inquiries Count Summary Card */}
-            <StatCard
-              variant="horizontal"
-              icon={MessageSquare}
-              value={unreadInquiriesCount > 0 ? `${unreadInquiriesCount} Unread Inquiries` : `${inquiries.length} Inquiries`}
-              subtitle={unreadInquiriesCount > 0 ? `${inquiries.length} total customer inquiries` : "Customer support concierge"}
-              trailingIcon={ChevronRight}
-              onClick={() => setActiveTab('inquiries')}
-            />
-
             {/* Quick Actions */}
-            <div className="grid grid-cols-3 gap-2 mt-0.5">
+            <div className="flex items-center gap-3 flex-wrap mt-1">
               <button
                 onClick={() => setActiveTab('catalog')}
-                className="min-h-[46px] bg-[#121212] text-white rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors shadow-xs"
+                className="min-h-[44px] px-5 bg-[#121212] text-white rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-800 transition-colors shadow-xs"
               >
                 <PlusCircle size={15} />
                 <span>ADD PIECE</span>
@@ -1351,7 +1391,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
               <button
                 onClick={() => setActiveTab('inquiries')}
-                className="min-h-[46px] bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                className="min-h-[44px] px-5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
               >
                 <MessageSquare size={15} />
                 <span>INQUIRIES</span>
@@ -1359,7 +1399,7 @@ export default function NikhilAdminDashboard({ onExit }) {
 
               <button
                 onClick={() => setActiveTab('drop-alerts')}
-                className="min-h-[46px] bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                className="min-h-[44px] px-5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
               >
                 <Bell size={15} />
                 <span>ALERTS</span>
@@ -1396,38 +1436,40 @@ export default function NikhilAdminDashboard({ onExit }) {
               </button>
             </div>
 
-            {/* Search Input - Clean & Non-overlapping */}
-            <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
-                <Search size={15} />
+            {/* Search Input & Filter Pills */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="relative w-full sm:flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
+                  <Search size={15} />
+                </div>
+                <input
+                  type="text"
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Search orders..."
+                  className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none shadow-xs transition-colors"
+                />
               </div>
-              <input
-                type="text"
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Search orders..."
-                className="w-full h-10 bg-white border border-zinc-200 focus:border-zinc-800 rounded-xl pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none shadow-xs transition-colors"
-              />
+
+              {/* Segmented Filter Pills */}
+              <div className="grid grid-cols-3 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1 w-full sm:w-72 shrink-0">
+                {['ALL', 'PENDING', 'PACKED'].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setOrderStatusFilter(filter)}
+                    className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                      orderStatusFilter === filter
+                        ? 'bg-[#121212] text-white shadow-xs'
+                        : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Segmented Filter Pills */}
-            <div className="grid grid-cols-3 bg-zinc-200/60 p-0.5 rounded-xl border border-zinc-200/80 gap-1">
-              {['ALL', 'PENDING', 'PACKED'].map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setOrderStatusFilter(filter)}
-                  className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
-                    orderStatusFilter === filter
-                      ? 'bg-[#121212] text-white shadow-xs'
-                      : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-
-            {/* Stacked Mobile Order Cards */}
+            {/* Responsive Order Cards Grid */}
             {loadingOrders ? (
               <div className="py-12 text-center text-zinc-500 text-xs">
                 <Loader2 size={22} className="animate-spin mx-auto mb-2 text-zinc-500" />
@@ -1442,7 +1484,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredOrders.map((order) => {
                   const isPacked = (order.status || '').toUpperCase() === 'PACKED';
                   const isUpdating = updatingOrderId === order.id;
@@ -1554,13 +1596,13 @@ export default function NikhilAdminDashboard({ onExit }) {
         )}
 
         {/* ========================================================
-            TAB 3: CATALOG TAB (QUICK PRODUCT ENTRY & DELETION)
+            TAB 3: CATALOG TAB (PRODUCT ENTRY & INVENTORY GRID)
         ======================================================== */}
         {activeTab === 'catalog' && (
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            {/* 1. Quick Mobile Product Entry Form */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+            {/* 1. Product Entry Form */}
+            <div className="lg:col-span-5 bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs lg:sticky lg:top-20">
               <div className="flex items-center gap-2 pb-3 mb-3.5 border-b border-zinc-100">
                 <PlusCircle size={16} className="text-zinc-900 shrink-0" />
                 <h2 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
@@ -1797,7 +1839,7 @@ export default function NikhilAdminDashboard({ onExit }) {
             </div>
 
             {/* 2. Existing Catalog List & Deletion */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="lg:col-span-7 bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs">
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-100">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
@@ -1828,7 +1870,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                   No products in catalog yet.
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {products.map((item) => {
                     const img = Array.isArray(item.images)
                       ? (item.images[0] || item.image_url)
@@ -2106,7 +2148,7 @@ export default function NikhilAdminDashboard({ onExit }) {
               ))}
             </div>
 
-            {/* Inquiries Cards */}
+            {/* Inquiries Cards Grid */}
             {inquiriesLoading ? (
               <div className="py-12 text-center text-zinc-500 text-xs">
                 <Loader2 size={22} className="animate-spin mx-auto mb-2 text-zinc-500" />
@@ -2121,7 +2163,7 @@ export default function NikhilAdminDashboard({ onExit }) {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredInquiries.map((inq) => {
                   const isResolved = (inq.status || '').toLowerCase() === 'resolved';
                   const isUpdating = updatingInquiryId === inq.id;
@@ -2613,12 +2655,12 @@ export default function NikhilAdminDashboard({ onExit }) {
       )}
 
       {/* ========================================================
-          4. MOBILE-FIRST FIXED BOTTOM NAVIGATION BAR
+          4. MOBILE-ONLY FIXED BOTTOM NAVIGATION BAR
           Tabs: Dashboard, Orders, Catalog, Inquiries, Alerts
-          With iPhone Safe-Area-Inset Support
+          With iPhone Safe-Area-Inset Support (Hidden on Desktop)
       ======================================================== */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0B0C]/95 backdrop-blur-md border-t border-zinc-800/80"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0B0C]/95 backdrop-blur-md border-t border-zinc-800/80"
         style={{
           height: 'calc(62px + env(safe-area-inset-bottom, 0px))',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
