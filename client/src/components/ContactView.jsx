@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Send, CheckCircle2 } from 'lucide-react';
 import supabase from '../supabaseClient';
+import nikhilBitmoji from '../assets/nikhil-bitmoji.jpg';
 
 const InstagramIcon = ({ size = 20, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -164,7 +165,12 @@ export default function ContactView({ settings }) {
         }}>
           {submitted ? (
             <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <CheckCircle2 size={48} color="var(--sage-light)" style={{ margin: '0 auto 16px' }} />
+              <img
+                src={nikhilBitmoji}
+                alt="Nikhil - CURATED"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover mx-auto mb-4 border-2 border-[#121212] shadow-md bg-black"
+              />
+              <CheckCircle2 size={40} color="var(--sage-light)" style={{ margin: '0 auto 16px' }} />
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>MESSAGE DISPATCHED</h3>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 Thank you for reaching out. Nikhil and the CURATED concierge team will review your message and reply via mobile or email shortly.
@@ -172,7 +178,34 @@ export default function ContactView({ settings }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>SEND A MESSAGE</h3>
+              <div className="flex items-center justify-between gap-3 pb-3 mb-1 border-b border-[var(--border-subtle)]">
+                <div>
+                  <span className="text-[10px] font-extrabold tracking-wider uppercase text-[var(--text-muted)] block">
+                    Concierge Direct
+                  </span>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>
+                    SEND A MESSAGE
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">
+                      Nikhil is online
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative shrink-0">
+                  <img
+                    src={nikhilBitmoji}
+                    alt="Nikhil - CURATED Concierge"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover bg-black border-2 border-[#121212] shadow-sm transition-transform hover:scale-105"
+                  />
+                  <span
+                    className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-xs"
+                    title="Active Concierge"
+                  />
+                </div>
+              </div>
 
               {error && (
                 <div style={{
