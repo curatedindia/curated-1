@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Send, CheckCircle2 } from 'lucide-react';
 import supabase from '../supabaseClient';
-import nikhilBitmoji from '../assets/nikhil-bitmoji.jpg';
+import nikhilBitmoji from '../assets/nikhil-bitmoji.png';
 
 const InstagramIcon = ({ size = 20, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -156,21 +156,35 @@ export default function ContactView({ settings }) {
           </div>
         </div>
 
-        {/* Contact Form */}
-        <div style={{
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '24px'
-        }}>
+        {/* Contact Form Container with Peeking Bitmoji at Border */}
+        <div
+          style={{
+            position: 'relative',
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '24px',
+            marginTop: '24px'
+          }}
+        >
+          {/* Peeking Bitmoji Sticker resting right on the top border */}
+          <div
+            className="absolute -top-12 sm:-top-14 md:-top-16 right-4 sm:right-6 md:right-8 z-10 pointer-events-none select-none"
+            aria-hidden="true"
+          >
+            <img
+              src={nikhilBitmoji}
+              alt="Nikhil - Concierge"
+              className="w-20 sm:w-24 md:w-28 h-auto select-none"
+              style={{
+                filter: 'drop-shadow(0 4px 10px rgba(0, 0, 0, 0.16))'
+              }}
+            />
+          </div>
+
           {submitted ? (
             <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <img
-                src={nikhilBitmoji}
-                alt="Nikhil - CURATED"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover mx-auto mb-4 border-2 border-[#121212] shadow-md bg-black"
-              />
-              <CheckCircle2 size={40} color="var(--sage-light)" style={{ margin: '0 auto 16px' }} />
+              <CheckCircle2 size={48} color="var(--sage-light)" style={{ margin: '0 auto 16px' }} />
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>MESSAGE DISPATCHED</h3>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 Thank you for reaching out. Nikhil and the CURATED concierge team will review your message and reply via mobile or email shortly.
@@ -178,34 +192,7 @@ export default function ContactView({ settings }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="flex items-center justify-between gap-3 pb-3 mb-1 border-b border-[var(--border-subtle)]">
-                <div>
-                  <span className="text-[10px] font-extrabold tracking-wider uppercase text-[var(--text-muted)] block">
-                    Concierge Direct
-                  </span>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>
-                    SEND A MESSAGE
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-                      Nikhil is online
-                    </span>
-                  </div>
-                </div>
-
-                <div className="relative shrink-0">
-                  <img
-                    src={nikhilBitmoji}
-                    alt="Nikhil - CURATED Concierge"
-                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover bg-black border-2 border-[#121212] shadow-sm transition-transform hover:scale-105"
-                  />
-                  <span
-                    className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-xs"
-                    title="Active Concierge"
-                  />
-                </div>
-              </div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>SEND A MESSAGE</h3>
 
               {error && (
                 <div style={{
